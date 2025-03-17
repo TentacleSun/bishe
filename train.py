@@ -60,6 +60,7 @@ def main():
     #TODO 查看日志相关模块并完善
     boardio = SummaryWriter(log_dir='checkpoints/' + args.exp_name)
 
+    
 
     return 
 if __name__=="__main__":
