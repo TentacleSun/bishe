@@ -45,9 +45,8 @@ class PointNet(nn.Module):
     def forward(self, input_data):
         # 输入：点云批次，以及点云批次类型
         # 输出：生成的PointNet高维度特征向量
-        if self.input_shape == "bcn":
+        if self.input_shape == "bnc":
             input_data = input_data.permute(0, 2, 1)
-        num_points = input_data.shape[1]
 
         output = input_data
         for idx, layer in enumerate(self.layers):
