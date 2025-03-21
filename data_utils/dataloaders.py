@@ -43,15 +43,11 @@ def load_data(train):
 	all_data = np.concatenate(all_data, axis=0)
 	all_label = np.concatenate(all_label, axis=0)
 	return all_data, all_label
-
-def deg_to_rad(deg):
-	return np.pi / 180 * deg
 		
 class ModelNet40Data(Dataset):
     def __init__(self, train=True, num_points=1024, randomize_data=False):
         super(ModelNet40Data, self).__init__()
         self.data, self.labels = load_data(train)
-        if not train: self.shapes = self.read_classes_ModelNet40()
         self.num_points = num_points
         self.randomize_data = randomize_data
 
@@ -82,7 +78,14 @@ class ModelNet40Data(Dataset):
     #     shape_names = np.array(shape_names.split('\n')[:-1])
     #     return shape_names
     
+class Rigidtransform:
+    def __init__(self, data_size, angle_range=45, trans_range=1, data_type=torch.float32):
+        self.angle_range = angle_range
+        self.translation_range = trans_range
+        self.dtype = data_type
 
+    def deg_to_rad(deg):
+        return np.pi / 180 * deg
 
 #获取配准数据对的数据对
 # TODO 加入生成点云配准的转换算法
@@ -94,11 +97,11 @@ class RegistrationData(Dataset):
         self.trans_algo = transform_algorithm
     
     def __len__(self):
-         return len(self.data_class)
+        return len(self.data_class)
     
     def __getitem__(self, index):
-         template, label = self.data_class[index]
-         
+        template, label = self.data_class[index]
+        
         
 if __name__=='__main__':
     load_data(False)
