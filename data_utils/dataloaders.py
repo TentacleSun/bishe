@@ -8,6 +8,7 @@ import glob
 import h5py
 import numpy as np
 import open3d as o3d
+import transform_utils
             
 # 读取点云数据
 def load_data(train):
@@ -62,14 +63,14 @@ class ModelNet40Data(Dataset):
     def __len__(self):
         return self.data.shape[0]
 
-    def get_shape(self, label):
-        return self.shapes[label]
+    # def get_shape(self, label):
+    #     return self.shapes[label]
 
     def randomize(self, idx):
         pt_idxs = np.arange(0, self.num_points)
         np.random.shuffle(pt_idxs)
         return self.data[idx, pt_idxs].copy()
-    # TODO弄懂这一步是在干什么
+    # TODO 弄懂这一步是在干什么
     # def read_classes_ModelNet40(self):
     #     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     #     DATA_DIR = os.path.join(BASE_DIR, os.pardir, 'data')
@@ -78,14 +79,60 @@ class ModelNet40Data(Dataset):
     #     shape_names = np.array(shape_names.split('\n')[:-1])
     #     return shape_names
     
+#给定数据集大小，创建随机刚性变换的配准数据
 class Rigidtransform:
     def __init__(self, data_size, angle_range=45, trans_range=1, data_type=torch.float32):
         self.angle_range = angle_range
         self.translation_range = trans_range
         self.dtype = data_type
+        self.data_size = data_size
+        self.transformations = [self.create_random_transformation(self.dtype,self.angle_range,self.translation_range) for _ in range(self.data_size)]
+    @staticmethod
+    def create_random_transformation(self, dtype, angle_range, translation_range):
+        #转弧度制
+        angle_range = self.deg_to_rad(angle_range)
+        rot_vec = np.random.uniform(-angle_range,angle_range,[1, 3])
+        trans_vec = np.random.uniform(-translation_range, translation_range, [1, 3])
+        quat = transform_utils.euler_to_quaternion(rot_vec, 'xyz')
+        
+        vec = np.concatenate([quat, trans_vec], axis=1)
+        return torch.tensor(vec, dtype=self.dtype)
+    
+    @staticmethod
+    def create_pose_7d(vector: torch.Tensor):
+        # Normalize the quaternion.
+        pre_normalized_quaternion = vector[:, 0:4]
+        normalized_quaternion = F.normalize(pre_normalized_quaternion, dim=1)
 
-    def deg_to_rad(deg):
-        return np.pi / 180 * deg
+        # B x 7 vector of 4 quaternions and 3 translation parameters
+        translation = vector[:, 4:]
+        vector = torch.cat([normalized_quaternion, translation], dim=1)
+        return vector.view([-1, 7])
+    
+    @staticmethod
+    def quaternion_rotate(point_cloud: torch.Tensor, pose_7d: torch.Tensor):
+        ndim = point_cloud.dim()
+        if ndim == 2:
+            N, _ = point_cloud.shape
+            assert pose_7d.shape[0] == 1
+            # repeat transformation vector for each point in shape
+            quat = pose_7d[:, 0:4].expand([N, -1])
+            rotated_point_cloud = transform_utils.qrot(quat, point_cloud)
+
+        elif ndim == 3:
+            B, N, _ = point_cloud.shape
+            quat = pose_7d[:, 0:4].unsqueeze(1).expand([-1, N, -1]).contiguous()
+            rotated_point_cloud = transform_utils.qrot(quat, point_cloud)
+
+        return rotated_point_cloud
+    
+    def get_transformation(self, index, source):
+        igt = self.create_pose_7d(self.transformations[index])
+        target= self.quaternion_rotate(source, igt) + igt[:, 4:]
+        
+        return target, igt
+        
+    
 
 #获取配准数据对的数据对
 # TODO 加入生成点云配准的转换算法
@@ -94,14 +141,17 @@ class RegistrationData(Dataset):
         super(RegistrationData, self).__init__()
         self.is_testing = is_testing
         self.data_class = data_class
-        self.trans_algo = transform_algorithm
+        if transform_algorithm=='rigid':
+            self.transform_class = Rigidtransform(data_size=len(data_class), angle_range=45, trans_range=1)
     
     def __len__(self):
         return len(self.data_class)
     
     def __getitem__(self, index):
         template, label = self.data_class[index]
+        source, igt = self.transform_class.get_transformation(index, template)
         
+        return template,source,igt
         
 if __name__=='__main__':
     load_data(False)
