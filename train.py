@@ -4,7 +4,9 @@ import torch
 import numpy as np
 from tensorboardX import SummaryWriter
 from data_utils import *
-from model import dgcnn, pointnet
+from model import dgcnn, pointnet, pcrnet
+from tqdm import tqdm
+from loss import EMDLoss, ChamferLoss
 #全局参数
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -54,6 +56,76 @@ def setArguments():
     args = argsParser.parse_args()
 
     return args
+
+def test_one_epoch(device, model, test_loader):
+	model.eval()
+	test_loss = 0.0
+	pred  = 0.0
+	count = 0
+	for i, data in enumerate(tqdm(test_loader)):
+		template, source, igt = data
+
+		template = template.to(device)
+		source = source.to(device)
+		igt = igt.to(device)
+
+		# mean substraction
+		source = source - torch.mean(source, dim=1, keepdim=True)
+		template = template - torch.mean(template, dim=1, keepdim=True)
+
+		output = model(template, source)
+		loss_val = ChamferDistanceLoss()(template, output['transformed_source'])
+
+		test_loss += loss_val.item()
+		count += 1
+
+	test_loss = float(test_loss)/count
+	return test_loss
+
+def test(args, model, test_loader, textio):
+	test_loss = test_one_epoch(args.device, model, test_loader)
+	textio.cprint('Validation Loss: %f'%(test_loss))
+def train_one_epoch(device, model, train_loader, optimizer):
+	model.train()
+	train_loss = 0.0
+	pred  = 0.0
+	count = 0
+	for i, data in enumerate(tqdm(train_loader)):
+		template, source, igt = data
+
+		template = template.to(device)
+		source = source.to(device)
+		igt = igt.to(device)
+
+		# mean substraction
+		source = source - torch.mean(source, dim=1, keepdim=True)
+		template = template - torch.mean(template, dim=1, keepdim=True)
+
+		output = model(template, source)
+		loss_val = ChamferLoss()(template, output['transformed_source'])
+		# print(loss_val.item())
+
+		# forward + backward + optimize
+		optimizer.zero_grad()
+		loss_val.backward()
+		optimizer.step()
+
+		train_loss += loss_val.item()
+		count += 1
+
+	train_loss = float(train_loss)/count
+	return train_loss
+def train(args, model, train_loader, test_loader):
+    learnable_params = filter(lambda p: p.requires_grad, model.parameters())
+    if args.optimizer == 'Adam':
+        optimizer = torch.optim.Adam(learnable_params)
+    else:
+        optimizer = torch.optim.SGD(learnable_params, lr=0.1)
+
+    # TODO 加上检查点恢复训练部分
+    best_test_loss = np.inf
+    for epoch in range(args.start_epoch, args.epochs):
+        train_loss = train_one_epoch(args.device, model, train_loader, optimizer)
 def main():
     args = setArguments()
     if args.deterministic == True:
@@ -76,14 +148,16 @@ def main():
         args.device = 'mps'
     else:
         args.device = 'cpu'
-        
+    device =torch.device(args.device)
+
     if args.featfn == 'dgcnn':
         featfn = dgcnn.DGCNN(emb_dim=args.emb_dims)
     elif args.featfn == 'pointnet':
         featfn = pointnet.PointNet(emb_dim=args.emb_dims)
-    model = PC
-        
-    train(args, model)
+    model = pcrnet.PCRNet(feature_model=featfn)
+    model = model.to(device)
+
+    train(args, model, train_loader, test_loader)
         
     return 
 if __name__=="__main__":

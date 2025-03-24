@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from .pointnet import PointNet
-from .dgcnn import DGCNN
+from pointnet import PointNet
+from dgcnn import DGCNN
 from ..utils import Pooling
 from ..data_utils import Rigidtransform
 
@@ -67,9 +67,9 @@ class PCRNet(nn.Module):
 
 
 if __name__ == '__main__':
+	
 	template, source = torch.rand(10,1024,3), torch.rand(10,1024,3)
 	pn = PointNet()
 	
 	net = PCRNet(pn)
 	result = net(template, source)
-	import ipdb; ipdb.set_trace()
