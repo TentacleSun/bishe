@@ -26,7 +26,7 @@ def setArguments():
     argsParser.add_argument('--dataset_path', type=str , default=BASE_DIR+'/dataset', metavar='PATH', help='path to the dataset')
 
     # 对称函数与特征函数
-    argsParser.add_argument('--featfn', default='dgcnn', type=str, choices=['pointnet', 'dgcnn'],
+    argsParser.add_argument('--featfn', default='pointnet', type=str, choices=['pointnet', 'dgcnn'],
                         help='feature extraction function choice(default: dgcnn)')
     argsParser.add_argument('--emb_dims', default=1024, type=int,
                         metavar='K', help='dim. of the feature vector (default: 1024)')
@@ -74,7 +74,7 @@ def test_one_epoch(device, model, test_loader):
 		template = template - torch.mean(template, dim=1, keepdim=True)
 
 		output = model(template, source)
-		loss_val = ChamferDistanceLoss()(template, output['transformed_source'])
+		loss_val = ChamferLoss()(template, output['transformed_source'])
 
 		test_loss += loss_val.item()
 		count += 1
@@ -126,6 +126,22 @@ def train(args, model, train_loader, test_loader):
     best_test_loss = np.inf
     for epoch in range(args.start_epoch, args.epochs):
         train_loss = train_one_epoch(args.device, model, train_loader, optimizer)
+        test_loss = test_one_epoch(args.device, model, test_loader)
+        
+        if test_loss< best_test_loss:
+            best_test_loss = test_loss
+            snap = {'epoch': epoch + 1,
+					'model': model.state_dict(),
+					'min_loss': best_test_loss,
+					'optimizer' : optimizer.state_dict(),}
+            torch.save(snap, 'checkpoints/%s/models/best_model_snap.t7' % (args.exp_name))
+            torch.save(model.state_dict(), 'checkpoints/%s/models/best_model.t7' % (args.exp_name))
+            torch.save(model.feature_model.state_dict(), 'checkpoints/%s/models/best_ptnet_model.t7' % (args.exp_name))
+
+        torch.save(snap, 'checkpoints/%s/models/model_snap.t7' % (args.exp_name))
+        torch.save(model.state_dict(), 'checkpoints/%s/models/model.t7' % (args.exp_name))
+        torch.save(model.feature_model.state_dict(), 'checkpoints/%s/models/ptnet_model.t7' % (args.exp_name))
+        print('EPOCH:: %d, Training Loss: %f, Testing Loss: %f, Best Loss: %f' % (epoch + 1, train_loss, test_loss, best_test_loss))
 def main():
     args = setArguments()
     if args.deterministic == True:
@@ -153,7 +169,7 @@ def main():
     if args.featfn == 'dgcnn':
         featfn = dgcnn.DGCNN(emb_dim=args.emb_dims)
     elif args.featfn == 'pointnet':
-        featfn = pointnet.PointNet(emb_dim=args.emb_dims)
+        featfn = pointnet.PointNet(emb_dim=args.emb_dims,input_shape='bnc')
     model = pcrnet.PCRNet(feature_model=featfn)
     model = model.to(device)
 

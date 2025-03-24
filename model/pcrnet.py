@@ -1,10 +1,10 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from pointnet import PointNet
-from dgcnn import DGCNN
-from ..utils import Pooling
-from ..data_utils import Rigidtransform
+from .pointnet import PointNet
+from .dgcnn import DGCNN
+from utils import Pooling
+from data_utils import Rigidtransform
 
 
 class PCRNet(nn.Module):

@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from data_utils import *
+from model import PointNet, PCRNet
 # 定义一个批量正则化层
 # batch_norm = nn.BatchNorm1d(5)  # 对 5 维特征进行正则化
 
@@ -19,6 +20,13 @@ from data_utils import *
 # print("\n批量正则化后的数据：")
 # print(output_data)
 
-trainset = RegistrationData(ModelNet40Data(train=True))
-train_loader = DataLoader(trainset,batch_size=100, shuffle=True, drop_last=True, num_workers=4)
+# trainset = RegistrationData(ModelNet40Data(train=True))
+# train_loader = DataLoader(trainset,batch_size=100, shuffle=True, drop_last=True, num_workers=4)
+# pass
+
+template, source = torch.rand(10,1024,3), torch.rand(10,1024,3)
+pn = PointNet(input_shape='bnc')
+
+net = PCRNet(pn)
+result = net(template, source)
 pass
