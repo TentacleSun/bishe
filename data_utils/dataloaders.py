@@ -1,6 +1,6 @@
 import torch.nn as nn
 import torch
-import torch.nn.functional as functional
+import torch.nn.functional as F
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 import os
@@ -15,9 +15,9 @@ def load_data(train):
 	if train: partition = 'train'
 	else: partition = 'test'
 	#BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-	BASE_DIR = os.path.dirname('/Users/sunjunyang/Desktop/bishe/')
+	BASE_DIR = os.path.dirname('/home/sunjunyang/bishe')
 	#DATA_DIR = os.path.join(BASE_DIR, os.pardir, 'data')
-	DATA_DIR = os.path.dirname('/Users/sunjunyang/Desktop/bishe/data/')
+	DATA_DIR = os.path.dirname('/home/sunjunyang/bishe/data/')
 	all_data = []
 	all_label = []
      
@@ -86,7 +86,11 @@ class Rigidtransform:
         self.translation_range = trans_range
         self.dtype = data_type
         self.data_size = data_size
-        self.transformations = [self.create_random_transformation(self.dtype,self.angle_range,self.translation_range) for _ in range(self.data_size)]
+        self.transformations = [self.create_random_transformation(self, self.dtype,self.angle_range,self.translation_range) for _ in range(self.data_size)]
+    @staticmethod
+    def deg_to_rad(deg):
+        return np.pi / 180 * deg
+    
     @staticmethod
     def create_random_transformation(self, dtype, angle_range, translation_range):
         #转弧度制
@@ -96,7 +100,7 @@ class Rigidtransform:
         quat = transform_utils.euler_to_quaternion(rot_vec, 'xyz')
         
         vec = np.concatenate([quat, trans_vec], axis=1)
-        return torch.tensor(vec, dtype=self.dtype)
+        return torch.tensor(vec, dtype=dtype)
     
     @staticmethod
     def create_pose_7d(vector: torch.Tensor):
@@ -125,6 +129,24 @@ class Rigidtransform:
             rotated_point_cloud = transform_utils.qrot(quat, point_cloud)
 
         return rotated_point_cloud
+    @staticmethod
+    def get_quaternion(pose_7d: torch.Tensor):
+        return pose_7d[:, 0:4]
+
+    @staticmethod
+    def get_translation(pose_7d: torch.Tensor):
+        return pose_7d[:, 4:]
+    
+    @staticmethod
+    def quaternion_transform(point_cloud: torch.Tensor, pose_7d: torch.Tensor):
+        transformed_point_cloud = Rigidtransform.quaternion_rotate(point_cloud, pose_7d) + Rigidtransform.get_translation(pose_7d).view(-1, 1, 3).repeat(1, point_cloud.shape[1], 1)      # Ps' = R*Ps + t
+        return transformed_point_cloud
+    @staticmethod
+    def convert2transformation(rotation_matrix: torch.Tensor, translation_vector: torch.Tensor):
+        one_ = torch.tensor([[[0.0, 0.0, 0.0, 1.0]]]).repeat(rotation_matrix.shape[0], 1, 1).to(rotation_matrix)    # (Bx1x4)
+        transformation_matrix = torch.cat([rotation_matrix, translation_vector[:,0,:].unsqueeze(-1)], dim=2)                        # (Bx3x4)
+        transformation_matrix = torch.cat([transformation_matrix, one_], dim=1)                                     # (Bx4x4)
+        return transformation_matrix
     
     def get_transformation(self, index, source):
         igt = self.create_pose_7d(self.transformations[index])
@@ -153,5 +175,9 @@ class RegistrationData(Dataset):
         
         return template,source,igt
         
-if __name__=='__main__':
-    load_data(False)
+# if __name__=='__main__':
+#     load_data(False)
+#     from ..transform_utils import *
+#     trainset = RegistrationData(ModelNet40Data(train=True))
+#     train_loader = DataLoader(trainset,batch_size=100, shuffle=True, drop_last=True, num_workers=4)
+    

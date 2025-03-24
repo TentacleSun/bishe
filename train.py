@@ -3,6 +3,8 @@ import os
 import torch
 import numpy as np
 from tensorboardX import SummaryWriter
+from data_utils import *
+from model import dgcnn, pointnet
 #全局参数
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -33,6 +35,8 @@ def setArguments():
                             help='use cudnn deterministic (default: false), accompany with --seed to repeate experiment')
     argsParser.add_argument('--seed', type=int, default=1234)
 
+    argsParser.add_argument('-j', '--workers', default=4, type=int,
+                        metavar='N', help='number of data loading workers (default: 4)')
     argsParser.add_argument('--batch_size', default=20, type=int,
                         metavar='N', help='mini-batch size (default: 32)')
     argsParser.add_argument('--epochs', default=200, type=int,
@@ -45,7 +49,7 @@ def setArguments():
                         metavar='N', help='manual epoch number (useful on restarts)')
     argsParser.add_argument('--pretrained', default='', type=str,
                         metavar='PATH', help='path to pretrained model file (default: null (no-use))')
-    argsParser.add_argument('--device', default='cuda:0', type=str,
+    argsParser.add_argument('--device', default='cuda', type=str,
                         metavar='DEVICE', help='use CUDA if available')
     args = argsParser.parse_args()
 
@@ -60,8 +64,27 @@ def main():
     #TODO 查看日志相关模块并完善
     boardio = SummaryWriter(log_dir='checkpoints/' + args.exp_name)
 
+    trainset = RegistrationData(data_class=ModelNet40Data(train=True))
+    train_loader = DataLoader(trainset, batch_size=args.batch_size,shuffle=True, drop_last=True, num_workers=args.workers)
+    testset = RegistrationData(data_class=ModelNet40Data(False))
+    test_loader = DataLoader(testset,batch_size=args.batch_size, shuffle=False, drop_last=False, num_workers=args.workers)
     
-
+    #判断设备
+    if torch.cuda.is_available():
+        args.device = 'cuda'
+    elif torch.mps.is_available():
+        args.device = 'mps'
+    else:
+        args.device = 'cpu'
+        
+    if args.featfn == 'dgcnn':
+        featfn = dgcnn.DGCNN(emb_dim=args.emb_dims)
+    elif args.featfn == 'pointnet':
+        featfn = pointnet.PointNet(emb_dim=args.emb_dims)
+    model = PC
+        
+    train(args, model)
+        
     return 
 if __name__=="__main__":
     main()
