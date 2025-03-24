@@ -15,9 +15,8 @@ def get_graph_feature(x, k=20, idx=None):
     elif torch.mps.is_available():
         device = torch.device('mps')
     else: device = torch.device('cpu')
-    idx_base = torch.arange(0, batch_size, device=device).view(-1, 1, 1)*num_points
+    idx_base = torch.arange(0, batch_size,device=device).view(-1, 1, 1)*num_points
     # idx_base = torch.arange(0, batch_size).view(-1, 1, 1) * num_points
-
     idx = idx + idx_base
 
     idx = idx.view(-1)
@@ -74,7 +73,7 @@ class DGCNN(nn.Module):
         self.conv5 = nn.Sequential(nn.Conv1d(512, self.emb_dim, kernel_size=1, bias=False),
                                    self.bn5,
                                    nn.LeakyReLU(self.negative_slope))
-        # self.linear1 = nn.Linear(args.emb_dims*2, 512, bias=False)
+        # self.linear1 = nn.Linear(emb_dim*2, emb_dim, bias=False)
         # self.bn6 = nn.BatchNorm1d(512)
         # self.dp1 = nn.Dropout(p=args.dropout)
         # self.linear2 = nn.Linear(512, 256)
@@ -105,7 +104,7 @@ class DGCNN(nn.Module):
 
         x = torch.cat((x1, x2, x3, x4), dim=1)
 
-        x = self.conv5(x).permute(0,2,1)
+        x = self.conv5(x)
         # x1 = F.adaptive_max_pool1d(x, 1).view(batch_size, -1)
         # x2 = F.adaptive_avg_pool1d(x, 1).view(batch_size, -1)
         # x = torch.cat((x1, x2), 1)

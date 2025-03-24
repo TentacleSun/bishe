@@ -171,7 +171,7 @@ def main():
     device =torch.device(args.device)
 
     if args.featfn == 'dgcnn':
-        featfn = dgcnn.DGCNN(emb_dim=args.emb_dims)
+        featfn = dgcnn.DGCNN(emb_dim=args.emb_dims, input_shape='bnc')
     elif args.featfn == 'pointnet':
         featfn = pointnet.PointNet(emb_dim=args.emb_dims,input_shape='bnc')
     
