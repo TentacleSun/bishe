@@ -115,14 +115,18 @@ def train_one_epoch(device, model, train_loader, optimizer):
 
 	train_loss = float(train_loss)/count
 	return train_loss
-def train(args, model, train_loader, test_loader):
+def train(args, model, train_loader, test_loader, checkpoint):
     learnable_params = filter(lambda p: p.requires_grad, model.parameters())
     if args.optimizer == 'Adam':
         optimizer = torch.optim.Adam(learnable_params)
     else:
         optimizer = torch.optim.SGD(learnable_params, lr=0.1)
 
-    # TODO 加上检查点恢复训练部分
+    # 检查点恢复训练部分
+    if checkpoint is not None:
+        min_loss = checkpoint['min_loss']
+        optimizer.load_state_dict(checkpoint['optimizer'])
+        
     best_test_loss = np.inf
     for epoch in range(args.start_epoch, args.epochs):
         train_loss = train_one_epoch(args.device, model, train_loader, optimizer)
@@ -133,7 +137,7 @@ def train(args, model, train_loader, test_loader):
             snap = {'epoch': epoch + 1,
 					'model': model.state_dict(),
 					'min_loss': best_test_loss,
-					'optimizer' : optimizer.state_dict(),}
+					'optimizer' : optimizer.state_dict()}
             torch.save(snap, 'checkpoints/%s/models/best_model_snap.t7' % (args.exp_name))
             torch.save(model.state_dict(), 'checkpoints/%s/models/best_model.t7' % (args.exp_name))
             torch.save(model.feature_model.state_dict(), 'checkpoints/%s/models/best_ptnet_model.t7' % (args.exp_name))
@@ -170,10 +174,22 @@ def main():
         featfn = dgcnn.DGCNN(emb_dim=args.emb_dims)
     elif args.featfn == 'pointnet':
         featfn = pointnet.PointNet(emb_dim=args.emb_dims,input_shape='bnc')
+    
     model = pcrnet.PCRNet(feature_model=featfn)
+    
+    checkpoint = None
+    if args.resume:
+        assert os.path.isfile(args.resume)
+        checkpoint = torch.load(args.resume)
+        args.start_epoch = checkpoint['epoch']
+        model.load_state_dict(checkpoint['model'])
+        
+    if args.pretrained:
+        assert os.path.isfile(args.pretrained)
+        model.load_state_dict(torch.load(args.pretrained, map_location=args.device))
     model = model.to(device)
 
-    train(args, model, train_loader, test_loader)
+    train(args, model, train_loader, test_loader, checkpoint)
         
     return 
 if __name__=="__main__":
