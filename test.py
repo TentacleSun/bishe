@@ -66,6 +66,21 @@ def test_one_epoch(device, model, test_loader):
 	for i, data in enumerate(tqdm(test_loader)):
 		template, source, igt = data
 
+		igt_t = igt[:,:, 4:]
+  
+		# 创建一个空的张量用于存储所有旋转矩阵，形状为 (20, 3, 3)
+		igt_R = torch.zeros(20, 3, 3)
+		q = igt[:,:, 0:4]
+		for j, rotate_tensor in enumerate(q):
+			w, x, y, z = rotate_tensor[..., 0], rotate_tensor[..., 1], rotate_tensor[..., 2], rotate_tensor[..., 3]
+			single_igt_R = torch.stack([
+				1 - 2 * (y**2 + z**2),     2 * (x*y - w*z),         2 * (x*z + w*y),
+				2 * (x*y + w*z),          1 - 2 * (x**2 + z**2),   2 * (y*z - w*x),
+				2 * (x*z - w*y),          2 * (y*z + w*x),         1 - 2 * (x**2 + y**2)
+			], dim=-1).view(3, 3)
+			# 将旋转矩阵存入 igt_R
+			igt_R[j] = single_igt_R
+
 		template = template.to(device)
 		source = source.to(device)
 		igt = igt.to(device)
@@ -148,7 +163,7 @@ def main():
 	device =torch.device(args.device)
 
 	# Create PointNet Model.
-	ptnet = PointNet(emb_dim=args.emb_dims)
+	ptnet = PointNet(emb_dim=args.emb_dims,input_shape='bnc')
 	model = PCRNet(feature_model=ptnet)
 	model = model.to(device)
 

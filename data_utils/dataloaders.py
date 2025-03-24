@@ -40,17 +40,18 @@ def load_data(train):
         f.close()
         all_data.append(data)
         all_label.append(label)
+        
         # for i, point_cloud in enumerate(data):
-        # 	# 创建 Open3D 点云对象
-        # 	pcd = o3d.geometry.PointCloud()
-        # 	pcd.points = o3d.utility.Vector3dVector(point_cloud)  # 设置点云坐标
+        #     # 创建 Open3D 点云对象
+        #     pcd = o3d.geometry.PointCloud()
+        #     pcd.points = o3d.utility.Vector3dVector(point_cloud)  # 设置点云坐标
 
-        # 	# 可选：为点云着色（例如随机颜色）
-        # 	pcd.paint_uniform_color([np.random.rand(), np.random.rand(), np.random.rand()])
+        #     # 可选：为点云着色（例如随机颜色）
+        #     pcd.paint_uniform_color([np.random.rand(), np.random.rand(), np.random.rand()])
 
-        # 	# 显示点云
-        # 	print(f"Displaying point cloud {i + 1} from file {h5_name}")
-        # 	o3d.visualization.draw_geometries([pcd])
+        #     # 显示点云
+        #     print(f"Displaying point cloud {i + 1} from file {h5_name}")
+        #     o3d.visualization.draw_geometries([pcd])
 
     all_data = np.concatenate(all_data, axis=0)
     all_label = np.concatenate(all_label, axis=0)
@@ -185,10 +186,3 @@ class RegistrationData(Dataset):
         source, igt = self.transform_class.get_transformation(index, template)
         
         return template,source,igt
-        
-# if __name__=='__main__':
-#     load_data(False)
-#     from ..transform_utils import *
-#     trainset = RegistrationData(ModelNet40Data(train=True))
-#     train_loader = DataLoader(trainset,batch_size=100, shuffle=True, drop_last=True, num_workers=4)
-    

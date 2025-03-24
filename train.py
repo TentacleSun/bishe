@@ -6,7 +6,7 @@ from tensorboardX import SummaryWriter
 from data_utils import *
 from model import dgcnn, pointnet, pcrnet
 from tqdm import tqdm
-from loss import EMDLoss, ChamferLoss
+from loss import ChamferLoss
 #全局参数
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 

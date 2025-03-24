@@ -24,9 +24,16 @@ from model import PointNet, PCRNet
 # train_loader = DataLoader(trainset,batch_size=100, shuffle=True, drop_last=True, num_workers=4)
 # pass
 
-template, source = torch.rand(10,1024,3), torch.rand(10,1024,3)
-pn = PointNet(input_shape='bnc')
+# template, source = torch.rand(10,1024,3), torch.rand(10,1024,3)
+# pn = PointNet(input_shape='bnc')
 
-net = PCRNet(pn)
-result = net(template, source)
-pass
+# net = PCRNet(pn)
+# result = net(template, source)
+# pass
+        
+if __name__=='__main__':
+    load_data(False)
+    from transform_utils import *
+    trainset = RegistrationData(ModelNet40Data(train=True))
+    train_loader = DataLoader(trainset,batch_size=100, shuffle=True, drop_last=True, num_workers=4)
+    
