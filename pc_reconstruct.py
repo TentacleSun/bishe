@@ -21,7 +21,7 @@ def setArguments():
     # 输入数据设置
     argsParser.add_argument('--dataset_type', default='modelnet40', choices=['modelnet40', 'custom'],
                         metavar='DATASET', help='dataset type (default: modelnet40)')
-    argsParser.add_argument('--num_points', default=2048, type=int,
+    argsParser.add_argument('--num_points', default=1024, type=int,
                         metavar='N', help='points in point-cloud (default: 1024)')
     argsParser.add_argument('--dataset_path', type=str , default=BASE_DIR+'/dataset', metavar='PATH', help='path to the dataset')
 
