@@ -106,7 +106,7 @@ def test_one_epoch(device, model, test_loader):
         source = source.to(device)
         # mean substraction
         source = source - torch.mean(source, dim=1, keepdim=True)
-        reconstruct = model(source)
+        reconstruct = model(source).permute(0,2,1)
         loss_val = ChamferLoss()(reconstruct, source)
 
         train_loss += loss_val.item()
