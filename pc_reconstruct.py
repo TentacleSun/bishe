@@ -21,7 +21,7 @@ def setArguments():
     # 输入数据设置
     argsParser.add_argument('--dataset_type', default='modelnet40', choices=['modelnet40', 'custom'],
                         metavar='DATASET', help='dataset type (default: modelnet40)')
-    argsParser.add_argument('--num_points', default=1024, type=int,
+    argsParser.add_argument('--num_points', default=2048, type=int,
                         metavar='N', help='points in point-cloud (default: 1024)')
     argsParser.add_argument('--dataset_path', type=str , default=BASE_DIR+'/dataset', metavar='PATH', help='path to the dataset')
 
@@ -62,9 +62,10 @@ class Trainunit(nn.Module):
         self.feature = feature
         self.reconstructor = reconstructor
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor):
+        # x = torch.transpose(x,1,2)
         # Step 1: Extract features
-        features = self.feature_extractor(x)
+        features = self.feature(x)
 
         # Step 2: Reconstruct point cloud
         reconstructed = self.reconstructor(features)
@@ -76,14 +77,13 @@ def train_one_epoch(device, model, train_loader, optimizer):
     train_loss = 0.0
     pred  = 0.0
     count = 0
-
     for i, data in enumerate(tqdm(train_loader)):
         template, source, igt = data
         source = source if torch.rand(1).item() < 0.5 else template
-        source = source.to(device)
+        source = source.to(device).contiguous()
         # mean substraction
         source = source - torch.mean(source, dim=1, keepdim=True)
-        reconstruct = model(source)
+        reconstruct = model(source).permute(0,2,1)
         loss_val = ChamferLoss()(reconstruct, source)
         
         optimizer.zero_grad()
@@ -169,8 +169,8 @@ def main():
     else:
         args.device = 'cpu'
 
-    ae = Autoencoder(args.emd_dim,args.num_points)
-    dgcnn = DGCNN('bnc',args.emd_dim,20)
+    ae = Autoencoder(args.emb_dims,args.num_points)
+    dgcnn = DGCNN('bnc',args.emb_dims,20)
     trainunit = Trainunit(dgcnn,ae)
 
     checkpoint = None
