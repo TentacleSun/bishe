@@ -14,7 +14,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 def setArguments():
     argsParser = argparse.ArgumentParser(description="PointCloud registration network trainning")
     # 基础设置
-    argsParser.add_argument('--exp_name', type=str, default='exp_ipcrnet', metavar='N',
+    argsParser.add_argument('--exp_name', type=str, default='exp_dgcnn', metavar='N',
                         help='Name of the experiment')
     argsParser.add_argument('--eval', type=bool, default=False, help='Train or Evaluate the network.')
 
@@ -38,7 +38,7 @@ def setArguments():
 
     argsParser.add_argument('-j', '--workers', default=4, type=int,
                         metavar='N', help='number of data loading workers (default: 4)')
-    argsParser.add_argument('--batch_size', default=20, type=int,
+    argsParser.add_argument('--batch_size', default=12, type=int,
                         metavar='N', help='mini-batch size (default: 32)')
     argsParser.add_argument('--epochs', default=200, type=int,
                         metavar='N', help='number of total epochs to run')
@@ -137,14 +137,15 @@ def train(args, model, train_loader, test_loader, checkpoint):
 					'model': model.state_dict(),
 					'min_loss': best_test_loss,
 					'optimizer' : optimizer.state_dict()}
-            extractor = model.Autoencoder
+            extractor = model.feature
+
             torch.save(snap, 'checkpoints/%s/models/best_model_snap.t7' % (args.exp_name))
             torch.save(extractor.state_dict(), 'checkpoints/%s/models/best_model.t7' % (args.exp_name))
-            torch.save(extractor.feature_model.state_dict(), 'checkpoints/%s/models/best_ptnet_model.t7' % (args.exp_name))
+            #torch.save(extractor.feature_model.state_dict(), 'checkpoints/%s/models/best_ptnet_model.t7' % (args.exp_name))
         
         torch.save(snap, 'checkpoints/%s/models/model_snap.t7' % (args.exp_name))
         torch.save(extractor.state_dict(), 'checkpoints/%s/models/model.t7' % (args.exp_name))
-        torch.save(extractor.feature_model.state_dict(), 'checkpoints/%s/models/ptnet_model.t7' % (args.exp_name))
+        #torch.save(extractor.feature_model.state_dict(), 'checkpoints/%s/models/ptnet_model.t7' % (args.exp_name))
         print('EPOCH:: %d, Training Loss: %f, Testing Loss: %f, Best Loss: %f' % (epoch + 1, train_loss, test_loss, best_test_loss))
         
 def main():

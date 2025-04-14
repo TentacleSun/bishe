@@ -123,12 +123,16 @@ def options():
 	parser.add_argument('--eval', type=bool, default=False, help='Train or Evaluate the network.')
 
 	# settings for input data
+ 
 	parser.add_argument('--dataset_type', default='modelnet', choices=['modelnet', 'shapenet2'],
 						metavar='DATASET', help='dataset type (default: modelnet)')
 	parser.add_argument('--num_points', default=1024, type=int,
 						metavar='N', help='points in point-cloud (default: 1024)')
 
 	# settings for PointNet
+     # 对称函数与特征函数
+	parser.add_argument('--featfn', default='pointnet', type=str, choices=['pointnet', 'dgcnn'],
+                        help='feature extraction function choice(default: dgcnn)')
 	parser.add_argument('--emb_dims', default=1024, type=int,
 						metavar='K', help='dim. of the feature vector (default: 1024)')
 	parser.add_argument('--symfn', default='max', choices=['max', 'avg'],

@@ -16,12 +16,12 @@ class Autoencoder(nn.Module):
             nn.Linear(512, 256),
             nn.BatchNorm1d(256) if use_bn else nn.Identity(),
             nn.ReLU(),
-            nn.Linear(256, emb_dim)  # Refined global feature vector
+            #nn.Linear(256, emb_dim)  # Refined global feature vector
         )
 
         # Decoder: Fully connected layers to reconstruct point cloud
         self.decoder = nn.Sequential(
-            nn.Linear(emb_dim, 512),
+            nn.Linear(256, 512),
             nn.BatchNorm1d(512) if use_bn else nn.Identity(),
             nn.ReLU(),
             nn.Linear(512, 1024),
