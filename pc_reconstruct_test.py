@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn 
 from tqdm import tqdm
 from loss import ChamferLoss
-from model import Autoencoder, DGCNN
+from model import MLPDecoder, DGCNN
 import argparse
 import os
 import numpy as np
@@ -94,9 +94,10 @@ def test(args, trainunit, test_loader, device):
 
         source = source - torch.mean(source, dim=1, keepdim=True)
         template = trainunit(source)
-        loss_val = ChamferLoss()(template,source)
-        display_open3d(template, source)
-        test_loss += loss_val.item()
+        template = torch.permute(template,(0,2,1))
+       # loss_val = ChamferLoss()(template,source)
+        display_open3d(template.detach().cpu().numpy()[0], source.detach().cpu().numpy()[0])
+        #test_loss += loss_val.item()
         count += 1
     test_loss = float(test_loss)/count
     errors = np.mean(np.array(errors), axis=0)
@@ -122,7 +123,7 @@ def main():
     else:
         args.device = 'cpu'
 
-    ae = Autoencoder(args.emb_dims,args.num_points)
+    ae = MLPDecoder(args.emb_dims,args.num_points)
     dgcnn = DGCNN('bnc',args.emb_dims,20)
     trainunit = Trainunit(dgcnn,ae)
 

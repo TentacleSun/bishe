@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn 
 from tqdm import tqdm
 from loss import ChamferLoss
-from model import Autoencoder, DGCNN
+from model import MLPDecoder, DGCNN
 import argparse
 import os
 import numpy as np
@@ -115,7 +115,7 @@ def test_one_epoch(device, model, test_loader):
     train_loss = float(train_loss)/count 
     return train_loss
 
-def train(args, model, train_loader, test_loader, checkpoint):
+def train(args, model:nn.Module, train_loader, test_loader, checkpoint):
     learnable_params = filter(lambda p: p.requires_grad, model.parameters())
     if args.optimizer == 'Adam':
         optimizer = torch.optim.Adam(learnable_params)
@@ -138,13 +138,15 @@ def train(args, model, train_loader, test_loader, checkpoint):
 					'min_loss': best_test_loss,
 					'optimizer' : optimizer.state_dict()}
             extractor = model.feature
-
+            reconstructor = model.reconstructor
             torch.save(snap, 'checkpoints/%s/models/best_model_snap.t7' % (args.exp_name))
             torch.save(extractor.state_dict(), 'checkpoints/%s/models/best_model.t7' % (args.exp_name))
             #torch.save(extractor.feature_model.state_dict(), 'checkpoints/%s/models/best_ptnet_model.t7' % (args.exp_name))
+            torch.save(reconstructor.state_dict(), 'checkpoints/%s/models/best_model_reco.t7' % (args.exp_name))
         
         torch.save(snap, 'checkpoints/%s/models/model_snap.t7' % (args.exp_name))
         torch.save(extractor.state_dict(), 'checkpoints/%s/models/model.t7' % (args.exp_name))
+        torch.save(reconstructor.state_dict(), 'checkpoints/%s/models/model_reco.t7' % (args.exp_name))
         #torch.save(extractor.feature_model.state_dict(), 'checkpoints/%s/models/ptnet_model.t7' % (args.exp_name))
         print('EPOCH:: %d, Training Loss: %f, Testing Loss: %f, Best Loss: %f' % (epoch + 1, train_loss, test_loss, best_test_loss))
         
@@ -170,20 +172,20 @@ def main():
     else:
         args.device = 'cpu'
 
-    ae = Autoencoder(args.emb_dims,args.num_points)
+    mlp = MLPDecoder(args.emb_dims,args.num_points)
     dgcnn = DGCNN('bnc',args.emb_dims,20)
-    trainunit = Trainunit(dgcnn,ae)
+    trainunit = Trainunit(dgcnn,mlp)
 
     checkpoint = None
     if args.resume:
         assert os.path.isfile(args.resume)
         checkpoint = torch.load(args.resume)
         args.start_epoch = checkpoint['epoch']
-        ae.load_state_dict(checkpoint['model'])
+        mlp.load_state_dict(checkpoint['model'])
         
     if args.pretrained:
         assert os.path.isfile(args.pretrained)
-        ae.load_state_dict(torch.load(args.pretrained, map_location=args.device))
+        mlp.load_state_dict(torch.load(args.pretrained, map_location=args.device))
     
     device =torch.device(args.device)
     trainunit = trainunit.to(device)
