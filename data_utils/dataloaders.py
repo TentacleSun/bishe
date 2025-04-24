@@ -10,59 +10,62 @@ import h5py
 import numpy as np
 import open3d as o3d
 import transform_utils
+import random
             
 
-# 读取点云数据
-def load_data(train):
-    if train: partition = 'train'
-    else: partition = 'test'
-    if sys.platform == 'linux':
-        BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-        #BASE_DIR = os.path.dirname('/home/sunjunyang/bishe')
-        DATA_DIR = os.path.join(BASE_DIR, os.pardir, 'data')
-        #DATA_DIR = os.path.dirname('/home/sunjunyang/bishe/data/')
-    elif sys.platform == 'darwin':
-        BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-        #BASE_DIR = os.path.dirname('/Users/sunjunyang/Desktop/bishe/')
-        DATA_DIR = os.path.join(BASE_DIR, os.pardir, 'data')
-        #DATA_DIR = os.path.dirname('/Users/sunjunyang/Desktop/bishe/data')
-    else:
-        raise OSError('your system is not capable of this program')
 
-    all_data = []
-    all_label = []
-     
-	# 遍历 HDF5 文件
-    for h5_name in glob.glob(os.path.join(DATA_DIR, 'modelnet40_ply_hdf5_2048', 'ply_data_%s*.h5' % partition)):
-        f = h5py.File(h5_name)
-        data = f['data'][:].astype('float32')
-        label = f['label'][:].astype('int64')
-        f.close()
-        all_data.append(data)
-        all_label.append(label)
-        
-        # for i, point_cloud in enumerate(data):
-        #     # 创建 Open3D 点云对象
-        #     pcd = o3d.geometry.PointCloud()
-        #     pcd.points = o3d.utility.Vector3dVector(point_cloud)  # 设置点云坐标
-
-        #     # 可选：为点云着色（例如随机颜色）
-        #     pcd.paint_uniform_color([np.random.rand(), np.random.rand(), np.random.rand()])
-
-        #     # 显示点云
-        #     print(f"Displaying point cloud {i + 1} from file {h5_name}")
-        #     o3d.visualization.draw_geometries([pcd])
-
-    all_data = np.concatenate(all_data, axis=0)
-    all_label = np.concatenate(all_label, axis=0)
-    return all_data, all_label
 		
 class ModelNet40Data(Dataset):
+
     def __init__(self, train=True, num_points=1024, randomize_data=False):
         super(ModelNet40Data, self).__init__()
-        self.data, self.labels = load_data(train)
+        self.data, self.labels = self.load_data(train)
         self.num_points = num_points
         self.randomize_data = randomize_data
+
+    def load_data(self, train):
+        if train: partition = 'train'
+        else: partition = 'test'
+        if sys.platform == 'linux':
+            BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+            #BASE_DIR = os.path.dirname('/home/sunjunyang/bishe')
+            DATA_DIR = os.path.join(BASE_DIR, os.pardir, 'data')
+            #DATA_DIR = os.path.dirname('/home/sunjunyang/bishe/data/')
+        elif sys.platform == 'darwin':
+            BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+            #BASE_DIR = os.path.dirname('/Users/sunjunyang/Desktop/bishe/')
+            DATA_DIR = os.path.join(BASE_DIR, os.pardir, 'data')
+            #DATA_DIR = os.path.dirname('/Users/sunjunyang/Desktop/bishe/data')
+        else:
+            raise OSError('your system is not capable of this program')
+
+        all_data = []
+        all_label = []
+        
+        # 遍历 HDF5 文件
+        for h5_name in glob.glob(os.path.join(DATA_DIR, 'modelnet40_ply_hdf5_2048', 'ply_data_%s*.h5' % partition)):
+            f = h5py.File(h5_name)
+            data = f['data'][:].astype('float32')
+            label = f['label'][:].astype('int64')
+            f.close()
+            all_data.append(data)
+            all_label.append(label)
+            
+            # for i, point_cloud in enumerate(data):
+            #     # 创建 Open3D 点云对象
+            #     pcd = o3d.geometry.PointCloud()
+            #     pcd.points = o3d.utility.Vector3dVector(point_cloud)  # 设置点云坐标
+
+            #     # 可选：为点云着色（例如随机颜色）
+            #     pcd.paint_uniform_color([np.random.rand(), np.random.rand(), np.random.rand()])
+
+            #     # 显示点云
+            #     print(f"Displaying point cloud {i + 1} from file {h5_name}")
+            #     o3d.visualization.draw_geometries([pcd])
+
+        all_data = np.concatenate(all_data, axis=0)
+        all_label = np.concatenate(all_label, axis=0)
+        return all_data, all_label
 
     def __getitem__(self, idx):
         if self.randomize_data: 
@@ -82,15 +85,69 @@ class ModelNet40Data(Dataset):
         pt_idxs = np.arange(0, self.num_points)
         np.random.shuffle(pt_idxs)
         return self.data[idx, pt_idxs].copy()
-    # TODO 弄懂这一步是在干什么
-    # def read_classes_ModelNet40(self):
-    #     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    #     DATA_DIR = os.path.join(BASE_DIR, os.pardir, 'data')
-    #     file = open(os.path.join(DATA_DIR, 'modelnet40_ply_hdf5_2048', 'shape_names.txt'), 'r')
-    #     shape_names = file.read()
-    #     shape_names = np.array(shape_names.split('\n')[:-1])
-    #     return shape_names
-    
+
+class Match3D(Dataset):
+    def __init__(self, train=True, num_points=1024, transform_algorithm='rigid', is_testing=False):
+        super(Match3D, self).__init__()
+        self.data, self.labels = self.load_data(train)
+        self.num_points = num_points
+
+        if train: partition = 'train'
+        else: partition = 'test'
+        self.root = '/Users/sunjunyang/Downloads/threedmatch'
+        train_ids = self.read_ids('./data_utils/train.txt')
+        files = sorted(os.listdir(self.root))
+        self.suffixes, self.clss = {}, {}
+        for file in files:
+            suffix = file.split('.')[-1]
+            self.suffixes[suffix] = self.suffixes.get(suffix, 0) + 1
+            cls = file.split('@')[0]
+            if cls not in train_ids:
+                continue
+
+            if '0.30' in file:
+                seq_id = file.split('@')[1][:6]
+                pairs = self.read_correspondence_pairs(os.path.join(self.root, file))
+                self.clss[(cls, seq_id)] = self.clss.get((cls, seq_id), 0) + len(pairs)
+        print(self.suffixes)
+        for cls, num in self.clss.items():
+            print(cls, num)
+        ids = set([cls[0] for cls, num in self.clss.items()])
+        print('Total class: {}, npairs: {}'.format(len(ids), sum(self.clss.values())))
+
+
+    def __getitem__(self, idx):
+
+        id, seq = random.choice(list(self.clss.keys()))
+        #id, seq = '7-scenes-chess', 'seq-01'
+        id_seq_path = os.path.join(self.root, '{}@{}-0.30.txt'.format(id, seq))
+        pairs = self.read_correspondence_pairs(id_seq_path)
+        pair = random.choice(pairs)
+
+    def load_data(self, pair):
+        path1, path2 = os.path.join(self.root, pair[0]), os.path.join(self.root, pair[1])
+        pc1, pc2 = np.load(path1), np.load(path2)
+        pcd1, pcd2 = np.asarray(pc1['pcd']), np.asarray(pc2['pcd'])
+
+    def downsample(self, pcd):
+        
+
+    def __len__(self):
+        return 7960
+    def read_correspondence_pairs(path):
+        pairs = []
+        with open(path, 'r') as f:
+            lines = f.readlines()
+            for line in lines:
+                pairs.append(line.split())
+        return pairs
+    def read_ids(path):
+        ids = []
+        with open(path, 'r') as f:
+            lines = f.readlines()
+            for line in lines:
+                ids.append(line.strip())
+        return ids  
 #给定数据集大小，创建随机刚性变换的配准数据
 class Rigidtransform:
     def __init__(self, data_size, angle_range=45, trans_range=1, data_type=torch.float32):
@@ -165,9 +222,7 @@ class Rigidtransform:
         target= self.quaternion_rotate(source, igt) + igt[:, 4:]
         
         return target, igt
-        
     
-
 #获取配准数据对的数据对
 # TODO 加入生成点云配准的转换算法
 class RegistrationData(Dataset):
