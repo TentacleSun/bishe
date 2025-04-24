@@ -105,7 +105,7 @@ class DGCNN(nn.Module):
         x = torch.cat((x1, x2, x3, x4), dim=1)
 
         x = self.conv5(x)
-        x1 = F.adaptive_max_pool1d(x, 1).view(batch_size, -1)
+        # x1 = F.adaptive_max_pool1d(x, 1).view(batch_size, -1)
         # x2 = F.adaptive_avg_pool1d(x, 1).view(batch_size, -1)
         # x = torch.cat((x1, x2), 1)
 
@@ -115,17 +115,17 @@ class DGCNN(nn.Module):
         # x = self.dp2(x)
         # x = self.linear3(x)
         # 返回类型：[b，c，n]
-        return x1
+        return x
 
 
 #测试函数
 if __name__ == '__main__':
     # Test the code.
-    x = torch.rand((10,1024,3)).to(torch.device('cuda'))
+    x = torch.rand((10,1024,3)).to(torch.device('mps'))
     # if torch.cuda.is_available():
     #     device = torch.device('cuda')
     # x = x.to(device)
-    pn = DGCNN(input_shape="bnc").to(torch.device('cuda'))
+    pn = DGCNN(input_shape="bnc").to(torch.device('mps'))
     y = pn(x)
     print("Network Architecture: ")
     print(pn)

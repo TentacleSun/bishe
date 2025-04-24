@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter
 from tqdm import tqdm
 import transforms3d
-from model import PointNet,PCRNet
+from model import PointNet,PCRNet,DGCNN
 from loss import ChamferLoss
 from data_utils import RegistrationData, ModelNet40Data
 
@@ -116,7 +116,7 @@ def test(args, model, test_loader):
 
 def options():
 	parser = argparse.ArgumentParser(description='Point Cloud Registration')
-	parser.add_argument('--exp_name', type=str, default='exp_ipcrnet', metavar='N',
+	parser.add_argument('--exp_name', type=str, default='exp_ipcrnetdg', metavar='N',
 						help='Name of the experiment')
 	parser.add_argument('--dataset_path', type=str, default='ModelNet40',
 						metavar='PATH', help='path to the input dataset') # like '/path/to/ModelNet40'
@@ -131,7 +131,7 @@ def options():
 
 	# settings for PointNet
      # 对称函数与特征函数
-	parser.add_argument('--featfn', default='pointnet', type=str, choices=['pointnet', 'dgcnn'],
+	parser.add_argument('--featfn', default='dgcnn', type=str, choices=['pointnet', 'dgcnn'],
                         help='feature extraction function choice(default: dgcnn)')
 	parser.add_argument('--emb_dims', default=1024, type=int,
 						metavar='K', help='dim. of the feature vector (default: 1024)')
@@ -141,9 +141,9 @@ def options():
 	# settings for on training
 	parser.add_argument('-j', '--workers', default=4, type=int,
 						metavar='N', help='number of data loading workers (default: 4)')
-	parser.add_argument('-b', '--batch_size', default=20, type=int,
+	parser.add_argument('-b', '--batch_size', default=1, type=int,
 						metavar='N', help='mini-batch size (default: 32)')
-	parser.add_argument('--pretrained', default='/home/sunjunyang/bishe/checkpoints/exp_ipcrnet/models/best_model.t7', type=str,
+	parser.add_argument('--pretrained', default='/Users/sunjunyang/Desktop/bishe/checkpoints/exp_ipcrnetdg/models/best_model.t7', type=str,
 						metavar='PATH', help='path to pretrained model file (default: null (no-use))')
 	parser.add_argument('--device', default='cuda:0', type=str,
 						metavar='DEVICE', help='use CUDA if available')
@@ -167,7 +167,7 @@ def main():
 	device =torch.device(args.device)
 
 	# Create PointNet Model.
-	ptnet = PointNet(emb_dim=args.emb_dims,input_shape='bnc')
+	ptnet = DGCNN(emb_dim=args.emb_dims,input_shape='bnc',k=10)
 	model = PCRNet(feature_model=ptnet)
 	model = model.to(device)
 
