@@ -115,16 +115,24 @@ class DGCNN(nn.Module):
         # self.linear3 = nn.Linear(256, output_channels)
         self.mlp1 = nn.Sequential(
             nn.Linear(3,64,True),
-            nn.ReLU(),
+            nn.BatchNorm1d(64),
+            nn.LeakyReLU(inplace=True),
+
             nn.Linear(64, 64,True),
-            nn.ReLU(),
+            #nn.BatchNorm1d(64),
+            nn.LeakyReLU(inplace=True),
+
             nn.Linear(64, 64,True)
         )
         self.mlp2 = nn.Sequential(
-            nn.Linear(64,128,True)
+            nn.Linear(64,128,True),
+            nn.BatchNorm1d(128),
+            nn.LeakyReLU(inplace=True),
         )
         self.mlp3 = nn.Sequential(
-            nn.Linear(128,self.emb_dim,True)
+            nn.Linear(128,self.emb_dim,True),
+            nn.BatchNorm1d(self.emb_dim),
+            nn.LeakyReLU(inplace=True),
         )
 
     def forward(self, x):

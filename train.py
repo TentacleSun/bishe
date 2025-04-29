@@ -16,7 +16,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 def setArguments():
     argsParser = argparse.ArgumentParser(description="PointCloud registration network trainning")
     # 基础设置
-    argsParser.add_argument('--exp_name', type=str, default='exp_ipcrnet', metavar='N',
+    argsParser.add_argument('--exp_name', type=str, default='exp_dgcnn', metavar='N',
                         help='Name of the experiment')
     argsParser.add_argument('--eval', type=bool, default=False, help='Train or Evaluate the network.')
 
@@ -30,18 +30,18 @@ def setArguments():
     # 对称函数与特征函数
     argsParser.add_argument('--featfn', default='dgcnn', type=str, choices=['pointnet', 'dgcnn'],
                         help='feature extraction function choice(default: dgcnn)')
-    argsParser.add_argument('--emb_dims', default=512, type=int,
+    argsParser.add_argument('--emb_dims', default=2048, type=int,
                         metavar='K', help='dim. of the feature vector (default: 1024)')
     argsParser.add_argument('--symfn', default='max', choices=['max', 'avg'],
                         help='symmetric function (default: max)')
     # 训练设置
     argsParser.add_argument('--deterministic', type=bool,default=False,
                             help='use cudnn deterministic (default: false), accompany with --seed to repeate experiment')
-    argsParser.add_argument('--seed', type=int, default=1234)
+    argsParser.add_argument('--seed', type=int, default=1224334)
 
     argsParser.add_argument('-j', '--workers', default=4, type=int,
                         metavar='N', help='number of data loading workers (default: 4)')
-    argsParser.add_argument('--batch_size', default=4, type=int,
+    argsParser.add_argument('--batch_size', default=7, type=int,
                         metavar='N', help='mini-batch size (default: 32)')
     argsParser.add_argument('--epochs', default=200, type=int,
                         metavar='N', help='number of total epochs to run')
@@ -106,21 +106,24 @@ def train_one_epoch(device, model, train_loader, optimizer):
 		output = model(template, source)
 		loss_val = ChamferLoss()(template, output['transformed_source'])
 		# print(loss_val.item())
+		
 
 		# forward + backward + optimize
 		optimizer.zero_grad()
 		loss_val.backward()
+
 		optimizer.step()
 
 		train_loss += loss_val.item()
 		count += 1
-
+	for name, parms in model.named_parameters():
+		print('-->name:', name, '-->grad_requirs:', parms.requires_grad, '--weight', torch.mean(parms.data), ' -->grad_value:', torch.mean(parms.grad))
 	train_loss = float(train_loss)/count
 	return train_loss
 def train(args, model, train_loader, test_loader, checkpoint):
     learnable_params = filter(lambda p: p.requires_grad, model.parameters())
     if args.optimizer == 'Adam':
-        optimizer = torch.optim.Adam(learnable_params)
+        optimizer = torch.optim.Adam(learnable_params,lr =0.0008)
     else:
         optimizer = torch.optim.SGD(learnable_params, lr=0.1)
 
