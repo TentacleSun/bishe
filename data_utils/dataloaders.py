@@ -130,7 +130,7 @@ class Match3D(Dataset):
         pcd1, pcd2 = np.asarray(pc1['pcd']), np.asarray(pc2['pcd'])
 
     def downsample(self, pcd):
-        
+        pass
 
     def __len__(self):
         return 7960

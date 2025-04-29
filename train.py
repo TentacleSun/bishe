@@ -6,7 +6,8 @@ from tensorboardX import SummaryWriter
 from data_utils import *
 from model import dgcnn, pointnet, pcrnet
 from tqdm import tqdm
-from loss import ChamferLoss
+from loss import ChamferLoss, EMDLoss
+from torchsummary import summary
 
 #全局参数
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -27,9 +28,9 @@ def setArguments():
     argsParser.add_argument('--dataset_path', type=str , default=BASE_DIR+'/dataset', metavar='PATH', help='path to the dataset')
 
     # 对称函数与特征函数
-    argsParser.add_argument('--featfn', default='pointnet', type=str, choices=['pointnet', 'dgcnn'],
+    argsParser.add_argument('--featfn', default='dgcnn', type=str, choices=['pointnet', 'dgcnn'],
                         help='feature extraction function choice(default: dgcnn)')
-    argsParser.add_argument('--emb_dims', default=1024, type=int,
+    argsParser.add_argument('--emb_dims', default=512, type=int,
                         metavar='K', help='dim. of the feature vector (default: 1024)')
     argsParser.add_argument('--symfn', default='max', choices=['max', 'avg'],
                         help='symmetric function (default: max)')
@@ -40,7 +41,7 @@ def setArguments():
 
     argsParser.add_argument('-j', '--workers', default=4, type=int,
                         metavar='N', help='number of data loading workers (default: 4)')
-    argsParser.add_argument('--batch_size', default=10, type=int,
+    argsParser.add_argument('--batch_size', default=4, type=int,
                         metavar='N', help='mini-batch size (default: 32)')
     argsParser.add_argument('--epochs', default=200, type=int,
                         metavar='N', help='number of total epochs to run')
@@ -189,6 +190,7 @@ def main():
         assert os.path.isfile(args.pretrained)
         model.load_state_dict(torch.load(args.pretrained, map_location=args.device))
     model = model.to(device)
+    print(model)
 
     train(args, model, train_loader, test_loader, checkpoint)
         

@@ -4,9 +4,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-def get_graph_feature(x, k=20, idx=None):
+def get_graph_feature(x:torch.Tensor, k=20, idx=None):
     batch_size = x.size(0)
-    num_points = x.size(2)
+    num_points = x.size(1)
     x = x.view(batch_size, -1, num_points)
     if idx is None:
         idx = knn(x, k=k)   # (batch_size, num_points, k)
@@ -15,22 +15,22 @@ def get_graph_feature(x, k=20, idx=None):
     elif torch.mps.is_available():
         device = torch.device('mps')
     else: device = torch.device('cpu')
-    idx_base = torch.arange(0, batch_size,device=device).view(-1, 1, 1)*num_points
-    # idx_base = torch.arange(0, batch_size).view(-1, 1, 1) * num_points
-    idx = idx + idx_base
+    # idx_base = torch.arange(0, batch_size,device=device).view(-1, 1, 1)*num_points
+    # # idx_base = torch.arange(0, batch_size).view(-1, 1, 1) * num_points
+    # idx = idx + idx_base
 
-    idx = idx.view(-1)
+    # idx = idx.view(-1)
  
-    _, num_dims, _ = x.size()
+    # _, num_dims, _ = x.size()
 
-    x = x.transpose(2, 1).contiguous()   # (batch_size, num_points, num_dims)  -> (batch_size*num_points, num_dims) #   batch_size * num_points * k + range(0, batch_size*num_points)
-    feature = x.view(batch_size*num_points, -1)[idx, :]
-    feature = feature.view(batch_size, num_points, k, num_dims) 
-    x = x.view(batch_size, num_points, 1, num_dims).repeat(1, 1, k, 1)
+    # x = x.transpose(2, 1).contiguous()   # (batch_size, num_points, num_dims)  -> (batch_size, num_points, num_dims) #   batch_size * num_points * k + range(0, batch_size*num_points)
+    # feature = x.view(batch_size*num_points, -1)[idx, :]
+    # feature = feature.view(batch_size, num_points, k, num_dims) 
+    # x = x.view(batch_size, num_points, 1, num_dims).repeat(1, 1, k, 1)
     
-    feature = torch.cat((feature-x, x), dim=3).permute(0, 3, 1, 2).contiguous()
+    # feature = torch.cat((feature-x, x), dim=3).permute(0, 3, 1, 2).contiguous()
   
-    return feature
+    return idx
 
 def knn(x, k):
     inner = -2*torch.matmul(x.transpose(2, 1), x)
@@ -39,6 +39,35 @@ def knn(x, k):
  
     idx = pairwise_distance.topk(k=k, dim=-1)[1]   # (batch_size, num_points, k)
     return idx
+import torch
+
+def combine_point_cloud_and_knn(point_cloud, knn_indices):
+    """
+    根据 KNN 下标矩阵从点云数据中提取邻居特征。
+    
+    参数:
+        point_cloud (torch.Tensor): 点云数据，形状为 (batch_size, num_points, channels)。
+        knn_indices (torch.Tensor): KNN 下标矩阵，形状为 (batch_size, num_points, topk)。
+    
+    返回:
+        torch.Tensor: 邻居特征，形状为 (batch_size, num_points, topk, channels)。
+    """
+    batch_size, num_points, channels = point_cloud.size()
+    _, _, topk = knn_indices.size()
+
+    # Step 1: 展平点云数据
+    point_cloud_flat = point_cloud.view(batch_size * num_points, channels)
+
+    # Step 2: 展平 KNN 下标矩阵
+    knn_indices_flat = knn_indices.view(batch_size * num_points * topk)
+
+    # Step 3: 提取邻居特征
+    neighbor_features_flat = point_cloud_flat[knn_indices_flat]
+
+    # Step 4: 恢复形状
+    neighbor_features = neighbor_features_flat.view(batch_size, num_points, topk, channels)
+
+    return neighbor_features
 
 
 class DGCNN(nn.Module):
@@ -52,27 +81,31 @@ class DGCNN(nn.Module):
         self.emb_dim = emb_dim
         self.negative_slope = negative_slope
 
-        self.bn1 = nn.BatchNorm2d(64)
-        self.bn2 = nn.BatchNorm2d(64)
-        self.bn3 = nn.BatchNorm2d(128)
-        self.bn4 = nn.BatchNorm2d(256)
-        self.bn5 = nn.BatchNorm1d(self.emb_dim)
+        # self.ch1_output_num = int(self.emb_dim/8)
+        # self.ch2_output_num = int(self.emb_dim/8)
+        # self.ch3_output_num = int(self.emb_dim/4)
+        # self.ch4_output_num = int(self.emb_dim/2)
+        # self.bn1 = nn.BatchNorm2d(self.ch1_output_num)
+        # self.bn2 = nn.BatchNorm2d(self.ch2_output_num)
+        # self.bn3 = nn.BatchNorm2d(self.ch3_output_num)
+        # self.bn4 = nn.BatchNorm2d(self.ch4_output_num)
+        # # self.bn5 = nn.BatchNorm1d(self.emb_dim)
 
-        self.conv1 = nn.Sequential(nn.Conv2d(6, 64, kernel_size=1, bias=False),
-                                   self.bn1,
-                                   nn.LeakyReLU(self.negative_slope))
-        self.conv2 = nn.Sequential(nn.Conv2d(64*2, 64, kernel_size=1, bias=False),
-                                   self.bn2,
-                                   nn.LeakyReLU(self.negative_slope))
-        self.conv3 = nn.Sequential(nn.Conv2d(64*2, 128, kernel_size=1, bias=False),
-                                   self.bn3,
-                                   nn.LeakyReLU(self.negative_slope))
-        self.conv4 = nn.Sequential(nn.Conv2d(128*2, 256, kernel_size=1, bias=False),
-                                   self.bn4,
-                                   nn.LeakyReLU(self.negative_slope))
-        self.conv5 = nn.Sequential(nn.Conv1d(512, self.emb_dim, kernel_size=1, bias=False),
-                                   self.bn5,
-                                   nn.LeakyReLU(self.negative_slope))
+        # self.conv1 = nn.Sequential(nn.Conv2d(6, self.ch1_output_num, kernel_size=1, bias=False),
+        #                            self.bn1,
+        #                            nn.LeakyReLU(self.negative_slope))
+        # self.conv2 = nn.Sequential(nn.Conv2d(self.ch1_output_num*2, self.ch2_output_num, kernel_size=1, bias=False),
+        #                            self.bn2,
+        #                            nn.LeakyReLU(self.negative_slope))
+        # self.conv3 = nn.Sequential(nn.Conv2d(self.ch2_output_num*2, self.ch3_output_num, kernel_size=1, bias=False),
+        #                            self.bn3,
+        #                            nn.LeakyReLU(self.negative_slope))
+        # self.conv4 = nn.Sequential(nn.Conv2d(self.ch3_output_num*2, self.ch4_output_num, kernel_size=1, bias=False),
+        #                            self.bn4,
+        #                            nn.LeakyReLU(self.negative_slope))
+        # self.conv5 = nn.Sequential(nn.Conv1d(512, self.emb_dim, kernel_size=1, bias=False),
+        #                            self.bn5,
+        #                            nn.LeakyReLU(self.negative_slope))
         # self.linear1 = nn.Linear(emb_dim*2, emb_dim, bias=False)
         # self.bn6 = nn.BatchNorm1d(512)
         # self.dp1 = nn.Dropout(p=args.dropout)
@@ -80,53 +113,54 @@ class DGCNN(nn.Module):
         # self.bn7 = nn.BatchNorm1d(256)
         # self.dp2 = nn.Dropout(p=args.dropout)
         # self.linear3 = nn.Linear(256, output_channels)
+        self.mlp1 = nn.Sequential(
+            nn.Linear(3,64,True),
+            nn.ReLU(),
+            nn.Linear(64, 64,True),
+            nn.ReLU(),
+            nn.Linear(64, 64,True)
+        )
+        self.mlp2 = nn.Sequential(
+            nn.Linear(64,128,True)
+        )
+        self.mlp3 = nn.Sequential(
+            nn.Linear(128,self.emb_dim,True)
+        )
 
     def forward(self, x):
-        batch_size = x.size(0)
-        if self.input_shape == "bnc":
+
+        if self.input_shape == "bcn":
             x = x.permute(0, 2, 1)
+        channel = x.size(2)
+        batch_size = x.size(0)
+        number = x.size(1)
 
-        x = get_graph_feature(x, k=self.k)
-        x = self.conv1(x)
-        x1 = x.max(dim=-1, keepdim=False)[0]
+        topk = get_graph_feature(x, k=self.k)
+        topk_feature = combine_point_cloud_and_knn(x,topk).view(batch_size*number*self.k,-1)
 
-        x = get_graph_feature(x1, k=self.k)
-        x = self.conv2(x)
-        x2 = x.max(dim=-1, keepdim=False)[0]
+        x = self.mlp1(topk_feature)
+        x = x.view(batch_size,number,self.k,-1)
+        x = x.max(dim=2, keepdim=False)[0]
 
-        x = get_graph_feature(x2, k=self.k)
-        x = self.conv3(x)
-        x3 = x.max(dim=-1, keepdim=False)[0]
-
-        x = get_graph_feature(x3, k=self.k)
-        x = self.conv4(x)
-        x4 = x.max(dim=-1, keepdim=False)[0]
-
-        x = torch.cat((x1, x2, x3, x4), dim=1)
-
-        x = self.conv5(x)
-        # x1 = F.adaptive_max_pool1d(x, 1).view(batch_size, -1)
-        # x2 = F.adaptive_avg_pool1d(x, 1).view(batch_size, -1)
-        # x = torch.cat((x1, x2), 1)
-
-        # x = F.leaky_relu(self.bn6(self.linear1(x)), negative_slope=0.2)
-        # x = self.dp1(x)
-        # x = F.leaky_relu(self.bn7(self.linear2(x)), negative_slope=0.2)
-        # x = self.dp2(x)
-        # x = self.linear3(x)
-        # 返回类型：[b，c，n]
+        topk = get_graph_feature(x, k=self.k)
+        topk_feature = combine_point_cloud_and_knn(x,topk).view(batch_size*number*self.k,-1)
+        x = self.mlp2(topk_feature)
+        x = x.view(batch_size,number,self.k,-1)
+        x = x.max(dim=2, keepdim=False)[0]
+        x = self.mlp3(x)
         return x
 
 
 #测试函数
 if __name__ == '__main__':
     # Test the code.
-    x = torch.rand((10,1024,3)).to(torch.device('mps'))
+    x = torch.rand((10,1024,3)).to(torch.device('cuda')).float()
     # if torch.cuda.is_available():
     #     device = torch.device('cuda')
     # x = x.to(device)
-    pn = DGCNN(input_shape="bnc").to(torch.device('mps'))
+    pn = DGCNN(input_shape="bnc").to(torch.device('cuda'))
     y = pn(x)
     print("Network Architecture: ")
     print(pn)
     print("Input Shape of DGCNN: ", x.shape, "\nOutput Shape of DGCNN: ", y.shape)
+    get_graph_feature(x, 20)
