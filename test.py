@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter
 from tqdm import tqdm
 import transforms3d
-from model import PointNet,PCRNet,DGCNN
+from model import *
 from loss import ChamferLoss
 from data_utils import RegistrationData, ModelNet40Data
 
@@ -99,7 +99,7 @@ def test_one_epoch(device, model, test_loader):
 									   igt_t.detach().cpu().numpy(), est_t.detach().cpu().numpy()))
 
 		transformed_source = torch.bmm(est_R, source.permute(0, 2, 1)).permute(0,2,1) + est_t
-		display_open3d(template.detach().cpu().numpy()[0], source_original.detach().cpu().numpy()[0], transformed_source.detach().cpu().numpy()[0])
+		#display_open3d(template.detach().cpu().numpy()[0], source_original.detach().cpu().numpy()[0], transformed_source.detach().cpu().numpy()[0])
 
 		loss_val = ChamferLoss()(template, output['transformed_source'])
 
@@ -167,14 +167,14 @@ def main():
 	device =torch.device(args.device)
 
 	# Create PointNet Model.
-	ptnet = DGCNN(emb_dim=args.emb_dims,input_shape='bnc',k=10)
-	model = PCRNet(feature_model=ptnet)
-	model = model.to(device)
+	# ptnet = DGCNN(emb_dim=args.emb_dims,input_shape='bnc',k=10)
+	# model = PCRNet(feature_model=ptnet)
+	model = ICPRegistration().to(device)
 
-	if args.pretrained:
-		assert os.path.isfile(args.pretrained)
-		model.load_state_dict(torch.load(args.pretrained, map_location='cpu'))
-	model.to(args.device)
+	# if args.pretrained:
+	# 	assert os.path.isfile(args.pretrained)
+	# 	model.load_state_dict(torch.load(args.pretrained, map_location='cpu'))
+	# model.to(args.device)
 
 	test(args, model, test_loader)
 

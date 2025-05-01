@@ -13,8 +13,6 @@ import transform_utils
 import random
             
 
-
-		
 class ModelNet40Data(Dataset):
 
     def __init__(self, train=True, num_points=1024, randomize_data=False):
@@ -89,12 +87,12 @@ class ModelNet40Data(Dataset):
 class Match3D(Dataset):
     def __init__(self, train=True, num_points=1024, transform_algorithm='rigid', is_testing=False):
         super(Match3D, self).__init__()
-        self.data, self.labels = self.load_data(train)
+        # self.data, self.labels = self.load_data(train)
         self.num_points = num_points
 
         if train: partition = 'train'
         else: partition = 'test'
-        self.root = '/Users/sunjunyang/Downloads/threedmatch'
+        self.root = '/home/sunjunyang/bishe/data/3DMatch/threedmatch'
         train_ids = self.read_ids('./data_utils/train.txt')
         files = sorted(os.listdir(self.root))
         self.suffixes, self.clss = {}, {}
@@ -113,8 +111,9 @@ class Match3D(Dataset):
         for cls, num in self.clss.items():
             print(cls, num)
         ids = set([cls[0] for cls, num in self.clss.items()])
+        if transform_algorithm=='rigid':
+            self.transform_class = Rigidtransform(data_size=len(self), angle_range=45, trans_range=1)
         print('Total class: {}, npairs: {}'.format(len(ids), sum(self.clss.values())))
-
 
     def __getitem__(self, idx):
 
@@ -123,25 +122,32 @@ class Match3D(Dataset):
         id_seq_path = os.path.join(self.root, '{}@{}-0.30.txt'.format(id, seq))
         pairs = self.read_correspondence_pairs(id_seq_path)
         pair = random.choice(pairs)
-
+        pcd1,pcd2 = self.load_data(pair)
+        pcd1,pcd2 = torch.from_numpy(pcd1).float(),torch.from_numpy(pcd2).float()
+        source, igt = self.transform_class.get_transformation(idx, pcd2)
+        return pcd1, source, igt
     def load_data(self, pair):
         path1, path2 = os.path.join(self.root, pair[0]), os.path.join(self.root, pair[1])
         pc1, pc2 = np.load(path1), np.load(path2)
         pcd1, pcd2 = np.asarray(pc1['pcd']), np.asarray(pc2['pcd'])
+        pcd1, pcd2 = self.downsample(pcd1), self.downsample(pcd2)
+        return pcd1, pcd2
 
     def downsample(self, pcd):
-        pass
+        
+        indices= np.random.choice(pcd.shape[0], size=2048, replace=False)
+        return pcd[indices]
 
     def __len__(self):
         return 7960
-    def read_correspondence_pairs(path):
+    def read_correspondence_pairs(self,path):
         pairs = []
         with open(path, 'r') as f:
             lines = f.readlines()
             for line in lines:
                 pairs.append(line.split())
         return pairs
-    def read_ids(path):
+    def read_ids(self, path):
         ids = []
         with open(path, 'r') as f:
             lines = f.readlines()
@@ -237,7 +243,7 @@ class RegistrationData(Dataset):
         return len(self.data_class)
     
     def __getitem__(self, index):
-        template, label = self.data_class[index]
+        template = self.data_class[index][0]
         source, igt = self.transform_class.get_transformation(index, template)
         
         return template,source,igt

@@ -73,3 +73,4 @@ if __name__ == '__main__':
 	
 	net = PCRNet(pn)
 	result = net(template, source)
+	pass

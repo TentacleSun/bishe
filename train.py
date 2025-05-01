@@ -7,7 +7,6 @@ from data_utils import *
 from model import dgcnn, pointnet, pcrnet
 from tqdm import tqdm
 from loss import ChamferLoss, EMDLoss
-from torchsummary import summary
 
 #全局参数
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -16,19 +15,19 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 def setArguments():
     argsParser = argparse.ArgumentParser(description="PointCloud registration network trainning")
     # 基础设置
-    argsParser.add_argument('--exp_name', type=str, default='exp_dgcnn', metavar='N',
+    argsParser.add_argument('--exp_name', type=str, default='exp_3DMatch', metavar='N',
                         help='Name of the experiment')
     argsParser.add_argument('--eval', type=bool, default=False, help='Train or Evaluate the network.')
 
     # 输入数据设置
-    argsParser.add_argument('--dataset_type', default='modelnet40', choices=['modelnet40', 'custom'],
+    argsParser.add_argument('--dataset_type', default='3DMatch', choices=['modelnet40', '3DMatch'],
                         metavar='DATASET', help='dataset type (default: modelnet40)')
     argsParser.add_argument('--num_points', default=1024, type=int,
                         metavar='N', help='points in point-cloud (default: 1024)')
     argsParser.add_argument('--dataset_path', type=str , default=BASE_DIR+'/dataset', metavar='PATH', help='path to the dataset')
 
     # 对称函数与特征函数
-    argsParser.add_argument('--featfn', default='dgcnn', type=str, choices=['pointnet', 'dgcnn'],
+    argsParser.add_argument('--featfn', default='pointnet', type=str, choices=['pointnet', 'dgcnn'],
                         help='feature extraction function choice(default: dgcnn)')
     argsParser.add_argument('--emb_dims', default=2048, type=int,
                         metavar='K', help='dim. of the feature vector (default: 1024)')
@@ -41,7 +40,7 @@ def setArguments():
 
     argsParser.add_argument('-j', '--workers', default=4, type=int,
                         metavar='N', help='number of data loading workers (default: 4)')
-    argsParser.add_argument('--batch_size', default=7, type=int,
+    argsParser.add_argument('--batch_size', default=20, type=int,
                         metavar='N', help='mini-batch size (default: 32)')
     argsParser.add_argument('--epochs', default=200, type=int,
                         metavar='N', help='number of total epochs to run')
@@ -160,10 +159,14 @@ def main():
         np.random.seed(args.seed)
     #TODO 查看日志相关模块并完善
     boardio = SummaryWriter(log_dir='checkpoints/' + args.exp_name)
-
-    trainset = RegistrationData(data_class=ModelNet40Data(train=True))
+    if args.dataset_type=='modelnet40':
+        trainset = RegistrationData(data_class=ModelNet40Data(train=True))
+    else: trainset = Match3D(train=True)
     train_loader = DataLoader(trainset, batch_size=args.batch_size,shuffle=True, drop_last=True, num_workers=args.workers)
-    testset = RegistrationData(data_class=ModelNet40Data(False))
+    
+    if args.dataset_type=='modelnet40':
+        testset = RegistrationData(data_class=ModelNet40Data(train=True))
+    else: testset = Match3D(train=True)
     test_loader = DataLoader(testset,batch_size=args.batch_size, shuffle=False, drop_last=False, num_workers=args.workers)
     
     #判断设备
