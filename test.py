@@ -107,8 +107,9 @@ def test_one_epoch(device, model, test_loader):
 		count += 1
 
 	test_loss = float(test_loss)/count
-	errors = np.mean(np.array(errors), axis=0)
-	return test_loss, errors[0], errors[1]
+	rt_errors = np.mean(np.array(errors), axis=0)
+	std_errors = np.std(np.array(errors), axis=0)
+	return test_loss, rt_errors[0], rt_errors[1]
 
 def test(args, model, test_loader):
 	test_loss, translation_error, rotation_error = test_one_epoch(args.device, model, test_loader)
@@ -116,7 +117,7 @@ def test(args, model, test_loader):
 
 def options():
 	parser = argparse.ArgumentParser(description='Point Cloud Registration')
-	parser.add_argument('--exp_name', type=str, default='exp_ipcrnetdg', metavar='N',
+	parser.add_argument('--exp_name', type=str, default='exp_ipcrnet', metavar='N',
 						help='Name of the experiment')
 	parser.add_argument('--dataset_path', type=str, default='ModelNet40',
 						metavar='PATH', help='path to the input dataset') # like '/path/to/ModelNet40'
@@ -131,7 +132,7 @@ def options():
 
 	# settings for PointNet
      # 对称函数与特征函数
-	parser.add_argument('--featfn', default='dgcnn', type=str, choices=['pointnet', 'dgcnn'],
+	parser.add_argument('--featfn', default='pointnet', type=str, choices=['pointnet', 'dgcnn'],
                         help='feature extraction function choice(default: dgcnn)')
 	parser.add_argument('--emb_dims', default=1024, type=int,
 						metavar='K', help='dim. of the feature vector (default: 1024)')
@@ -143,7 +144,7 @@ def options():
 						metavar='N', help='number of data loading workers (default: 4)')
 	parser.add_argument('-b', '--batch_size', default=1, type=int,
 						metavar='N', help='mini-batch size (default: 32)')
-	parser.add_argument('--pretrained', default='/Users/sunjunyang/Desktop/bishe/checkpoints/exp_ipcrnetdg/models/best_model.t7', type=str,
+	parser.add_argument('--pretrained', default='/home/sunjunyang/bishe/checkpoints/exp_ipcrnet/models/best_model.t7', type=str,
 						metavar='PATH', help='path to pretrained model file (default: null (no-use))')
 	parser.add_argument('--device', default='cuda:0', type=str,
 						metavar='DEVICE', help='use CUDA if available')
@@ -167,14 +168,14 @@ def main():
 	device =torch.device(args.device)
 
 	# Create PointNet Model.
-	# ptnet = DGCNN(emb_dim=args.emb_dims,input_shape='bnc',k=10)
-	# model = PCRNet(feature_model=ptnet)
-	model = ICPRegistration().to(device)
-
-	# if args.pretrained:
-	# 	assert os.path.isfile(args.pretrained)
-	# 	model.load_state_dict(torch.load(args.pretrained, map_location='cpu'))
-	# model.to(args.device)
+	#ptnet = DGCNN(emb_dim=args.emb_dims,input_shape='bnc',k=10)
+	ptnet = PointNet(input_shape='bnc')
+	model = PCRNet(feature_model=ptnet)
+	# model = ICPRegistration().to(device)
+	if args.pretrained:
+		assert os.path.isfile(args.pretrained)
+		model.load_state_dict(torch.load(args.pretrained, map_location='cpu'))
+	model.to(args.device)
 
 	test(args, model, test_loader)
 

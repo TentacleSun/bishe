@@ -1,7 +1,8 @@
 import torch
 import torch.nn as nn
 from data_utils import *
-from model import ICPRegistration
+from model import DCP, PCRNet, PointNet
+from types import SimpleNamespace
 
 # 定义一个批量正则化层
 # batch_norm = nn.BatchNorm1d(5)  # 对 5 维特征进行正则化
@@ -26,10 +27,21 @@ from model import ICPRegistration
 # pass
 
 template, source = torch.rand(10,1024,3), torch.rand(10,1024,3)
-# pn = PointNet(input_shape='bnc')
+pn = PointNet(input_shape='bnc')
 
-# net = PCRNet(pn)
-net = ICPRegistration()
+net = PCRNet(pn)
+#net = ICPRegistration()
+# args = {
+#     'emb_dims':1024,
+#     'emb_nn': 'pointnet',
+#     'head': 'mlp',
+#     'n_blocks':1,
+#     'n_heads':4,
+#     'ff_dims':1024,
+#     'dropout':0.0,
+    
+# }
+# net = DCP(args=SimpleNamespace(**args))
 result = net(template, source)
 pass
         

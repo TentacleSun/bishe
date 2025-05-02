@@ -4,9 +4,10 @@ import torch
 import numpy as np
 from tensorboardX import SummaryWriter
 from data_utils import *
-from model import dgcnn, pointnet, pcrnet
+from model import dgcnn, pointnet, pcrnet,DCP
 from tqdm import tqdm
 from loss import ChamferLoss, EMDLoss
+from types import SimpleNamespace
 
 #全局参数
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -15,12 +16,12 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 def setArguments():
     argsParser = argparse.ArgumentParser(description="PointCloud registration network trainning")
     # 基础设置
-    argsParser.add_argument('--exp_name', type=str, default='exp_3DMatch', metavar='N',
+    argsParser.add_argument('--exp_name', type=str, default='exp_DCP', metavar='N',
                         help='Name of the experiment')
     argsParser.add_argument('--eval', type=bool, default=False, help='Train or Evaluate the network.')
 
     # 输入数据设置
-    argsParser.add_argument('--dataset_type', default='3DMatch', choices=['modelnet40', '3DMatch'],
+    argsParser.add_argument('--dataset_type', default='modelnet40', choices=['modelnet40', '3DMatch'],
                         metavar='DATASET', help='dataset type (default: modelnet40)')
     argsParser.add_argument('--num_points', default=1024, type=int,
                         metavar='N', help='points in point-cloud (default: 1024)')
@@ -29,7 +30,7 @@ def setArguments():
     # 对称函数与特征函数
     argsParser.add_argument('--featfn', default='pointnet', type=str, choices=['pointnet', 'dgcnn'],
                         help='feature extraction function choice(default: dgcnn)')
-    argsParser.add_argument('--emb_dims', default=2048, type=int,
+    argsParser.add_argument('--emb_dims', default=1024, type=int,
                         metavar='K', help='dim. of the feature vector (default: 1024)')
     argsParser.add_argument('--symfn', default='max', choices=['max', 'avg'],
                         help='symmetric function (default: max)')
@@ -40,7 +41,7 @@ def setArguments():
 
     argsParser.add_argument('-j', '--workers', default=4, type=int,
                         metavar='N', help='number of data loading workers (default: 4)')
-    argsParser.add_argument('--batch_size', default=20, type=int,
+    argsParser.add_argument('--batch_size', default=4, type=int,
                         metavar='N', help='mini-batch size (default: 32)')
     argsParser.add_argument('--epochs', default=200, type=int,
                         metavar='N', help='number of total epochs to run')
@@ -122,7 +123,7 @@ def train_one_epoch(device, model, train_loader, optimizer):
 def train(args, model, train_loader, test_loader, checkpoint):
     learnable_params = filter(lambda p: p.requires_grad, model.parameters())
     if args.optimizer == 'Adam':
-        optimizer = torch.optim.Adam(learnable_params,lr =0.0008)
+        optimizer = torch.optim.Adam(learnable_params)
     else:
         optimizer = torch.optim.SGD(learnable_params, lr=0.1)
 
@@ -144,11 +145,11 @@ def train(args, model, train_loader, test_loader, checkpoint):
 					'optimizer' : optimizer.state_dict()}
             torch.save(snap, 'checkpoints/%s/models/best_model_snap.t7' % (args.exp_name))
             torch.save(model.state_dict(), 'checkpoints/%s/models/best_model.t7' % (args.exp_name))
-            torch.save(model.feature_model.state_dict(), 'checkpoints/%s/models/best_ptnet_model.t7' % (args.exp_name))
+            #torch.save(model.feature_model.state_dict(), 'checkpoints/%s/models/best_ptnet_model.t7' % (args.exp_name))
 
         torch.save(snap, 'checkpoints/%s/models/model_snap.t7' % (args.exp_name))
         torch.save(model.state_dict(), 'checkpoints/%s/models/model.t7' % (args.exp_name))
-        torch.save(model.feature_model.state_dict(), 'checkpoints/%s/models/ptnet_model.t7' % (args.exp_name))
+        #torch.save(model.feature_model.state_dict(), 'checkpoints/%s/models/ptnet_model.t7' % (args.exp_name))
         print('EPOCH:: %d, Training Loss: %f, Testing Loss: %f, Best Loss: %f' % (epoch + 1, train_loss, test_loss, best_test_loss))
 def main():
     args = setArguments()
@@ -178,12 +179,23 @@ def main():
         args.device = 'cpu'
     device =torch.device(args.device)
 
-    if args.featfn == 'dgcnn':
-        featfn = dgcnn.DGCNN(emb_dim=args.emb_dims, input_shape='bnc')
-    elif args.featfn == 'pointnet':
-        featfn = pointnet.PointNet(emb_dim=args.emb_dims,input_shape='bnc')
+    # if args.featfn == 'dgcnn':
+    #     featfn = dgcnn.DGCNN(emb_dim=args.emb_dims, input_shape='bnc')
+    # elif args.featfn == 'pointnet':
+    #     featfn = pointnet.PointNet(emb_dim=args.emb_dims,input_shape='bnc')
     
-    model = pcrnet.PCRNet(feature_model=featfn)
+    # model = pcrnet.PCRNet(feature_model=featfn)
+    myargs = {
+    'emb_dims':1024,
+    'emb_nn': 'pointnet',
+    'head': 'mlp',
+    'n_blocks':1,
+    'n_heads':4,
+    'ff_dims':1024,
+    'dropout':0.0,
+}
+    model = DCP(args=SimpleNamespace(**myargs))
+
     
     checkpoint = None
     if args.resume:
@@ -192,9 +204,9 @@ def main():
         args.start_epoch = checkpoint['epoch']
         model.load_state_dict(checkpoint['model'])
         
-    if args.pretrained:
-        assert os.path.isfile(args.pretrained)
-        model.load_state_dict(torch.load(args.pretrained, map_location=args.device))
+    # if args.pretrained:
+    #     assert os.path.isfile(args.pretrained)
+    #     model.load_state_dict(torch.load(args.pretrained, map_location=args.device))
     model = model.to(device)
     print(model)
 
