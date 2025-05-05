@@ -517,7 +517,7 @@ class DCP(nn.Module):
 
         rotation_ab, translation_ab = self.head(src_embedding, tgt_embedding,
                                                 src, tgt)
-        transformed_src = torch.bmm(src,rotation_ab.transpose(1,1)) + translation_ab.unsqueeze(1)
+        transformed_src = torch.bmm(src,rotation_ab) + translation_ab.unsqueeze(1)
         return {'est_R': rotation_ab,				# source -> template
 				  'est_t': translation_ab,				# source -> template
 				#   'est_T': Rigidtransform.convert2transformation(est_R, est_t),			# source -> template
