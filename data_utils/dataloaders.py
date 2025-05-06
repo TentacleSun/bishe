@@ -232,8 +232,9 @@ class Rigidtransform:
 #获取配准数据对的数据对
 # TODO 加入生成点云配准的转换算法
 class RegistrationData(Dataset):
-    def __init__(self, data_class=ModelNet40Data(), transform_algorithm='rigid', is_testing=False):
+    def __init__(self,noise_level, data_class=ModelNet40Data(), transform_algorithm='rigid', is_testing=False):
         super(RegistrationData, self).__init__()
+        self.noise_leval = noise_level
         self.is_testing = is_testing
         self.data_class = data_class
         if transform_algorithm=='rigid':
@@ -245,5 +246,11 @@ class RegistrationData(Dataset):
     def __getitem__(self, index):
         template = self.data_class[index][0]
         source, igt = self.transform_class.get_transformation(index, template)
+        
+        template += self.noise_leval * torch.randn_like(template)
+        source += self.noise_leval * torch.randn_like(source)
+        indices = torch.randperm(template.size(0))
+        template = template[indices]
+        source = source[indices]
         
         return template,source,igt

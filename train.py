@@ -4,7 +4,7 @@ import torch
 import numpy as np
 from tensorboardX import SummaryWriter
 from data_utils import *
-from model import dgcnn, pointnet, pcrnet,DCP
+from model import dgcnn, pointnet, pcrnet,DCP,lucaskenade
 from tqdm import tqdm
 from loss import ChamferLoss, EMDLoss
 from types import SimpleNamespace
@@ -16,7 +16,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 def setArguments():
     argsParser = argparse.ArgumentParser(description="PointCloud registration network trainning")
     # 基础设置
-    argsParser.add_argument('--exp_name', type=str, default='exp_DCP', metavar='N',
+    argsParser.add_argument('--exp_name', type=str, default='exp_DCP2', metavar='N',
                         help='Name of the experiment')
     argsParser.add_argument('--eval', type=bool, default=False, help='Train or Evaluate the network.')
 
@@ -41,7 +41,7 @@ def setArguments():
 
     argsParser.add_argument('-j', '--workers', default=4, type=int,
                         metavar='N', help='number of data loading workers (default: 4)')
-    argsParser.add_argument('--batch_size', default=6, type=int,
+    argsParser.add_argument('--batch_size', default=20, type=int,
                         metavar='N', help='mini-batch size (default: 32)')
     argsParser.add_argument('--epochs', default=200, type=int,
                         metavar='N', help='number of total epochs to run')
@@ -116,8 +116,8 @@ def train_one_epoch(device, model, train_loader, optimizer):
 
 		train_loss += loss_val.item()
 		count += 1
-	for name, parms in model.named_parameters():
-		print('-->name:', name, '-->grad_requirs:', parms.requires_grad, '--weight', torch.mean(parms.data), ' -->grad_value:', torch.mean(parms.grad))
+	# for name, parms in model.named_parameters():
+	# 	print('-->name:', name, '-->grad_requirs:', parms.requires_grad, '--weight', torch.mean(parms.data), ' -->grad_value:', torch.mean(parms.grad))
 	train_loss = float(train_loss)/count
 	return train_loss
 def train(args, model, train_loader, test_loader, checkpoint):
@@ -161,12 +161,12 @@ def main():
     #TODO 查看日志相关模块并完善
     boardio = SummaryWriter(log_dir='checkpoints/' + args.exp_name)
     if args.dataset_type=='modelnet40':
-        trainset = RegistrationData(data_class=ModelNet40Data(train=True))
+        trainset = RegistrationData(noise_level=0,data_class=ModelNet40Data(train=True))
     else: trainset = Match3D(train=True)
     train_loader = DataLoader(trainset, batch_size=args.batch_size,shuffle=True, drop_last=True, num_workers=args.workers)
     
     if args.dataset_type=='modelnet40':
-        testset = RegistrationData(data_class=ModelNet40Data(train=True))
+        testset = RegistrationData(noise_level=0,data_class=ModelNet40Data(train=True))
     else: testset = Match3D(train=True)
     test_loader = DataLoader(testset,batch_size=args.batch_size, shuffle=False, drop_last=False, num_workers=args.workers)
     
@@ -184,18 +184,19 @@ def main():
     # elif args.featfn == 'pointnet':
     #     featfn = pointnet.PointNet(emb_dim=args.emb_dims,input_shape='bnc')
     
-    # model = pcrnet.PCRNet(feature_model=featfn)
+    #model = pcrnet.PCRNet(feature_model=featfn)
+#    model = lucaskenade.LucasKenade(mlp=featfn)
     myargs = {
     'emb_dims':1024,
     'emb_nn': 'pointnet',
-    'head': 'mlp',
+    'head': 'svd',
     'n_blocks':1,
     'n_heads':4,
     'ff_dims':1024,
     'dropout':0.0,
+    'pointer':'identity'
 }
     model = DCP(args=SimpleNamespace(**myargs))
-
     
     checkpoint = None
     if args.resume:

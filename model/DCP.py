@@ -429,8 +429,8 @@ class SVDHead(nn.Module):
     def forward(self, *input):
         src_embedding = input[0]
         tgt_embedding = input[1]
-        src = input[2]
-        tgt = input[3]
+        src = input[2].transpose(1,2).contiguous()
+        tgt = input[3].transpose(1,2).contiguous()
         batch_size = src.size(0)
 
         d_k = src_embedding.size(1)
@@ -488,10 +488,10 @@ class DCP(nn.Module):
         else:
             raise Exception('Not implemented')
 
-        # if args.pointer == 'identity':
-        #     self.pointer = Identity()
-        # elif args.pointer == 'transformer':
-        self.pointer = Transformer(args=args)
+        if args.pointer == 'identity':
+            self.pointer = Identity()
+        elif args.pointer == 'transformer':
+            self.pointer = Transformer(args=args)
         # else:
         #     raise Exception("Not implemented")
 

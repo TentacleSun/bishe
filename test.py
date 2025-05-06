@@ -15,7 +15,7 @@ import transforms3d
 from model import *
 from loss import ChamferLoss
 from data_utils import RegistrationData, ModelNet40Data
-
+from types import SimpleNamespace
 # Only if the files are in example folder.
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 if BASE_DIR[-8:] == 'examples':
@@ -91,7 +91,7 @@ def test_one_epoch(device, model, test_loader):
 		source = source - torch.mean(source, dim=1, keepdim=True)
 		template = template - torch.mean(template, dim=1, keepdim=True)
 
-		output = model(template, source)
+		output = model(template,source)
 		est_R = output['est_R']
 		est_t = output['est_t']
 
@@ -144,7 +144,7 @@ def options():
 						metavar='N', help='number of data loading workers (default: 4)')
 	parser.add_argument('-b', '--batch_size', default=1, type=int,
 						metavar='N', help='mini-batch size (default: 32)')
-	parser.add_argument('--pretrained', default='/home/sunjunyang/bishe/checkpoints/exp_ipcrnet/models/best_model.t7', type=str,
+	parser.add_argument('--pretrained', default='/home/sunjunyang/bishe/checkpoints/exp_DCP/models/best_model(1).t7', type=str,
 						metavar='PATH', help='path to pretrained model file (default: null (no-use))')
 	parser.add_argument('--device', default='cuda:0', type=str,
 						metavar='DEVICE', help='use CUDA if available')
@@ -155,7 +155,7 @@ def options():
 def main():
 	args = options()
 
-	testset = RegistrationData(data_class=ModelNet40Data(train=False),transform_algorithm='rigid', is_testing=True)
+	testset = RegistrationData(noise_level=0,data_class=ModelNet40Data(train=False),transform_algorithm='rigid', is_testing=True)
 	test_loader = DataLoader(testset, batch_size=args.batch_size, shuffle=False, drop_last=False, num_workers=args.workers)
 
 	#判断设备
@@ -169,9 +169,20 @@ def main():
 
 	# Create PointNet Model.
 	#ptnet = DGCNN(emb_dim=args.emb_dims,input_shape='bnc',k=10)
-	ptnet = PointNet(input_shape='bnc')
-	model = PCRNet(feature_model=ptnet)
-	# model = ICPRegistration().to(device)
+	# ptnet = PointNet(input_shape='bnc')
+	# model = PCRNet(feature_model=ptnet)
+	#model = ICPRegistration().to(device)
+	myargs = {
+	'emb_dims':1024,
+	'emb_nn': 'pointnet',
+	'head': 'mlp',
+	'n_blocks':1,
+	'n_heads':4,
+	'ff_dims':1024,
+	'dropout':0.0,
+    'pointer':'identity'
+	}
+	model = DCP(args=SimpleNamespace(**myargs))
 	if args.pretrained:
 		assert os.path.isfile(args.pretrained)
 		model.load_state_dict(torch.load(args.pretrained, map_location='cpu'))
