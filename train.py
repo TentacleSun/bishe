@@ -6,7 +6,7 @@ from tensorboardX import SummaryWriter
 from data_utils import *
 from model import dgcnn, pointnet, pcrnet,DCP,lucaskenade
 from tqdm import tqdm
-from loss import ChamferLoss, EMDLoss
+from loss import ChamferLoss, EMDLoss, SE3Loss
 from types import SimpleNamespace
 
 #全局参数
@@ -16,7 +16,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 def setArguments():
     argsParser = argparse.ArgumentParser(description="PointCloud registration network trainning")
     # 基础设置
-    argsParser.add_argument('--exp_name', type=str, default='exp_DCP2', metavar='N',
+    argsParser.add_argument('--exp_name', type=str, default='exp_ipcrnet', metavar='N',
                         help='Name of the experiment')
     argsParser.add_argument('--eval', type=bool, default=False, help='Train or Evaluate the network.')
 
@@ -41,14 +41,14 @@ def setArguments():
 
     argsParser.add_argument('-j', '--workers', default=4, type=int,
                         metavar='N', help='number of data loading workers (default: 4)')
-    argsParser.add_argument('--batch_size', default=20, type=int,
+    argsParser.add_argument('--batch_size', default=6, type=int,
                         metavar='N', help='mini-batch size (default: 32)')
     argsParser.add_argument('--epochs', default=200, type=int,
                         metavar='N', help='number of total epochs to run')
     argsParser.add_argument('--optimizer', default='Adam', choices=['Adam', 'SGD'],
                         metavar='METHOD', help='name of an optimizer (default: Adam)')
     argsParser.add_argument('--resume', default='', type=str,
-                        metavar='PATH', help='path to latest checkpoint (default: null (no-use)), used with --start_epoch argument')
+                        metavar='PATH', help='path to latest checkpoint (default:dd null (no-use)), used with --start_epoch argument')
     argsParser.add_argument('--start_epoch', default=0, type=int,
                         metavar='N', help='manual epoch number (useful on restarts)')
     argsParser.add_argument('--pretrained', default='', type=str,
@@ -76,8 +76,10 @@ def test_one_epoch(device, model, test_loader):
 		template = template - torch.mean(template, dim=1, keepdim=True)
 
 		output = model(template, source)
-		loss_val = ChamferLoss()(template, output['transformed_source'])
 
+		#loss_val = SE3Loss().forward(output['est_R'],output['est_t'],igt)
+		loss_val = ChamferLoss()(template, output['transformed_source'])
+        
 		test_loss += loss_val.item()
 		count += 1
 
@@ -94,7 +96,11 @@ def train_one_epoch(device, model, train_loader, optimizer):
 	count = 0
 	for i, data in enumerate(tqdm(train_loader)):
 		template, source, igt = data
-
+		# test1 = Rigidtransform.quaternion_transform(template[0],igt[0])
+		# x = ChamferLoss()(test1[0],source[0])
+		# test2 = Rigidtransform.quaternion_transform(source[0],igt[0]) 
+		# y = ChamferLoss()(test2[0],template[0])
+          
 		template = template.to(device)
 		source = source.to(device)
 		igt = igt.to(device)
@@ -106,8 +112,7 @@ def train_one_epoch(device, model, train_loader, optimizer):
 		output = model(template, source)
 		loss_val = ChamferLoss()(template, output['transformed_source'])
 		# print(loss_val.item())
-		
-
+		#loss_val = SE3Loss().forward(output['est_R'],output['est_t'],igt)
 		# forward + backward + optimize
 		optimizer.zero_grad()
 		loss_val.backward()
@@ -116,8 +121,8 @@ def train_one_epoch(device, model, train_loader, optimizer):
 
 		train_loss += loss_val.item()
 		count += 1
-	# for name, parms in model.named_parameters():
-	# 	print('-->name:', name, '-->grad_requirs:', parms.requires_grad, '--weight', torch.mean(parms.data), ' -->grad_value:', torch.mean(parms.grad))
+
+	
 	train_loss = float(train_loss)/count
 	return train_loss
 def train(args, model, train_loader, test_loader, checkpoint):
@@ -184,18 +189,18 @@ def main():
     # elif args.featfn == 'pointnet':
     #     featfn = pointnet.PointNet(emb_dim=args.emb_dims,input_shape='bnc')
     
-    #model = pcrnet.PCRNet(feature_model=featfn)
-#    model = lucaskenade.LucasKenade(mlp=featfn)
+    # model = pcrnet.PCRNet(feature_model=featfn)
+    #model = lucaskenade.LucasKenade(mlp=featfn)
     myargs = {
     'emb_dims':1024,
-    'emb_nn': 'pointnet',
+    'emb_nn': 'dgcnn',
     'head': 'svd',
     'n_blocks':1,
     'n_heads':4,
     'ff_dims':1024,
     'dropout':0.0,
-    'pointer':'identity'
-}
+    'pointer':'transformer'
+    }
     model = DCP(args=SimpleNamespace(**myargs))
     
     checkpoint = None

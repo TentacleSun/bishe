@@ -144,7 +144,7 @@ def options():
 						metavar='N', help='number of data loading workers (default: 4)')
 	parser.add_argument('-b', '--batch_size', default=1, type=int,
 						metavar='N', help='mini-batch size (default: 32)')
-	parser.add_argument('--pretrained', default='/home/sunjunyang/bishe/checkpoints/exp_DCP/models/best_model(1).t7', type=str,
+	parser.add_argument('--pretrained', default='/home/sjy/bishe/checkpoints/exp_ipcrnet/models/best_model.t7', type=str,
 						metavar='PATH', help='path to pretrained model file (default: null (no-use))')
 	parser.add_argument('--device', default='cuda:0', type=str,
 						metavar='DEVICE', help='use CUDA if available')
@@ -173,15 +173,15 @@ def main():
 	# model = PCRNet(feature_model=ptnet)
 	#model = ICPRegistration().to(device)
 	myargs = {
-	'emb_dims':1024,
-	'emb_nn': 'pointnet',
-	'head': 'mlp',
-	'n_blocks':1,
-	'n_heads':4,
-	'ff_dims':1024,
-	'dropout':0.0,
-    'pointer':'identity'
-	}
+    'emb_dims':1024,
+    'emb_nn': 'dgcnn',
+    'head': 'svd',
+    'n_blocks':1,
+    'n_heads':4,
+    'ff_dims':1024,
+    'dropout':0.0,
+    'pointer':'transformer'
+}
 	model = DCP(args=SimpleNamespace(**myargs))
 	if args.pretrained:
 		assert os.path.isfile(args.pretrained)

@@ -47,7 +47,7 @@ class PCRNet(nn.Module):
 		source = Rigidtransform.quaternion_transform(source, pose_7d)      # Ps' = est_R*Ps + est_t
 		return est_R, est_t, source
 
-	def forward(self, template, source, max_iteration=1):
+	def forward(self, template, source, max_iteration=8):
 		est_R = torch.eye(3).to(template).view(1, 3, 3).expand(template.size(0), 3, 3).contiguous()         # (Bx3x3)
 		est_t = torch.zeros(1,3).to(template).view(1, 1, 3).expand(template.size(0), 1, 3).contiguous()     # (Bx1x3)
 		template_features = self.pooling(self.feature_model(template))
